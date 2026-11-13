@@ -13,7 +13,7 @@ It changes nothing in Xymon: it only reads.
 
 It is optional, and shipped disabled. It is started by
 .I xymonlaunch(8)
-from the task file \fBtasks.d/xymonapi\fR beside tasks.cfg, which its
+from the task file \fBtasks.d/xymonapi.cfg\fR beside tasks.cfg, which its
 installation creates with a DISABLED line. To run it, remove that line;
 xymonlaunch starts it once xymond is running, and restarts it if it stops.
 
@@ -79,7 +79,7 @@ most 1 MiB of text.
 The N passages (5 by default, 20 at most) of Xymon's manual pages and of
 its history nearest QUESTION by meaning, best first, from the index that
 .I xymonapi-rag(1)
-builds: the task tasks.d/xymonapi-rag, once a day. Each passage says where
+builds: the task tasks.d/xymonapi-rag.cfg, once a day. Each passage says where
 it comes from -- page, section and item, or host, test and time -- and a
 history passage carries the status text the monitored host sent, marked as
 data, not instructions. The index is read again when the file changes, so
@@ -298,7 +298,7 @@ tokens.py, the server; xymonapi_client.py, the client the other plugins
 read it with; openapi.yaml, the description served at /openapi.json;
 requirements.txt, the Python modules it needs; and VERSION, what /health
 gives.
-.IP "\fB$XYMONHOME/etc/tasks.d/xymonapi\fR"
+.IP "\fB$XYMONHOME/etc/tasks.d/xymonapi.cfg\fR"
 The xymonlaunch task, installed with a DISABLED line. A later installation
 leaves it as it is.
 .IP "\fB$XYMONHOME/etc/xymonapi-apache.conf\fR, \fBxymonapi-nginx.conf\fR, \fBxymonapi-lighttpd.conf\fR"

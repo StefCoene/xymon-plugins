@@ -6,7 +6,7 @@
 # ./install.sh install-server -- install, its older spelling, as well -- puts
 # the API, with its client, in $XYMONHOME/ext/xymonapi/,
 # the search beside it, its manual page in man8/, and its task in
-# $XYMONHOME/etc/tasks.d/xymonapi -- disabled, with ENVFILE naming that
+# $XYMONHOME/etc/tasks.d/xymonapi.cfg -- disabled, with ENVFILE naming that
 # server's xymonserver.cfg. An install over one where the admin enabled the
 # task leaves that file alone: putting DISABLED back would stop the API at
 # the next upgrade, with nothing to say why. Without XYMONHOME it installs
@@ -62,7 +62,7 @@ for p in xymonapi xymonapi-rag; do
 done
 assert_file_exists "$work/man/man8/xymonapi.8"
 
-task=$home/etc/tasks.d/xymonapi
+task=$home/etc/tasks.d/xymonapi.cfg
 assert_file_exists "$task"
 grep -q '^[[:space:]]*DISABLED$' "$task" || fail "the task is not shipped DISABLED: $(cat "$task")"
 grep -q "^[[:space:]]*ENVFILE $home/etc/xymonserver.cfg\$" "$task" \
@@ -100,10 +100,10 @@ odd="$work/x y&z|w"
 	|| fail "install.sh install-server into a directory with a space, & and | failed: $(tail -n 5 "$work/odd.log")"
 assert_file_exists "$odd/ext/xymonapi/xymonapi.sh"
 assert_file_exists "$work/man 2/man8/xymonapi.8"
-grep -qF "ENVFILE $odd/etc/xymonserver.cfg" "$odd/etc/tasks.d/xymonapi" \
-	|| fail "the task file does not name that directory as it is: $(grep ENVFILE "$odd/etc/tasks.d/xymonapi")"
-grep -qF "ENVFILE $odd/etc/xymonserver.cfg" "$odd/etc/tasks.d/xymonapi-rag" \
-	|| fail "the index task file does not name that directory as it is: $(grep ENVFILE "$odd/etc/tasks.d/xymonapi-rag")"
+grep -qF "ENVFILE $odd/etc/xymonserver.cfg" "$odd/etc/tasks.d/xymonapi.cfg" \
+	|| fail "the task file does not name that directory as it is: $(grep ENVFILE "$odd/etc/tasks.d/xymonapi.cfg")"
+grep -qF "ENVFILE $odd/etc/xymonserver.cfg" "$odd/etc/tasks.d/xymonapi-rag.cfg" \
+	|| fail "the index task file does not name that directory as it is: $(grep ENVFILE "$odd/etc/tasks.d/xymonapi-rag.cfg")"
 
 assert_file_exists "$home/etc/xymonapi-apache.conf"
 grep -q 'ProxyPass ' "$home/etc/xymonapi-apache.conf" || fail "the Apache snippet has no ProxyPass"
@@ -182,7 +182,7 @@ for p in xymonapi; do
 done
 "$ROOT/install.sh" uninstall XYMONHOME="$home" MANDIR="$work/man" >"$work/uninstall.log" 2>&1 \
 	|| fail "install.sh uninstall-server failed: $(tail -n 5 "$work/uninstall.log")"
-for f in ext/xymonapi ext/xymonapi-mcp ext/xymonapi-rag etc/tasks.d/xymonapi etc/tasks.d/xymonapi-rag; do
+for f in ext/xymonapi ext/xymonapi-mcp ext/xymonapi-rag etc/tasks.d/xymonapi.cfg etc/tasks.d/xymonapi-rag.cfg; do
 	[ -e "$home/$f" ] && fail "install.sh uninstall-server left $f"
 done
 [ -e "$work/man/man8/xymonapi.8" ] && fail "install.sh uninstall-server left the manual page xymonapi.8"

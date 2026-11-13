@@ -160,16 +160,22 @@ dist() {
 	cp -f "$ROOT/install.sh" "$ROOT/LICENSE" "$DIST/"
 }
 
-# task PLUGIN -- its xymonlaunch task file as tasks.d/PLUGIN, @XYMONHOME@
+# task PLUGIN -- its xymonlaunch task file as tasks.d/PLUGIN.cfg, @XYMONHOME@
 # replaced, unless one is there already: the one an admin enabled is not put
 # back to DISABLED by the next install.
 task() {
 	t=$(field "$1" task); [ -n "$t" ] || return 0
 	mkdir -p "$TASKDIR"
+	# As PLUGIN.cfg: the Debian and Ubuntu packages of Xymon read only
+	# tasks.d/*.cfg, and a Xymon that reads the whole directory reads that
+	# name too. A task installed before, without the suffix, is kept as it
+	# is rather than doubled.
 	if [ -e "$TASKDIR/$1" ]; then
 		echo "keeping $TASKDIR/$1"
+	elif [ -e "$TASKDIR/$1.cfg" ]; then
+		echo "keeping $TASKDIR/$1.cfg"
 	else
-		sed -e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g" "$ROOT/plugins/$1/$t" > "$TASKDIR/$1" && chmod 644 "$TASKDIR/$1"
+		sed -e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g" "$ROOT/plugins/$1/$t" > "$TASKDIR/$1.cfg" && chmod 644 "$TASKDIR/$1.cfg"
 	fi
 }
 
@@ -337,7 +343,7 @@ uninstall_server() {
 	rm -rf "$EXTROOT/$1" "$DIST/plugins/$1"
 	m=$(field "$1" server-manual)
 	[ -n "$m" ] && rm -f "$DESTDIR$MANDIR/man${m##*.}/$m"
-	[ -n "$(field "$1" task)" ] && rm -f "$TASKDIR/$1"
+	[ -n "$(field "$1" task)" ] && rm -f "$TASKDIR/$1" "$TASKDIR/$1.cfg"
 	say "$1" uninstalled
 }
 

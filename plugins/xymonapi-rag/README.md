@@ -29,7 +29,7 @@ setting is in [`xymonapi-rag.1`](xymonapi-rag.1).
 XYMONHOME=/usr/lib/xymon/server ./install.sh install-server xymonapi-rag
 ```
 
-It installs the daily index task, `$XYMONHOME/etc/tasks.d/xymonapi-rag`,
+It installs the daily index task, `$XYMONHOME/etc/tasks.d/xymonapi-rag.cfg`,
 written `DISABLED`. To enable it, put `XYMONAPI_RAG_DOCS` -- a directory
 with Xymon's manual pages; `/usr/share/man` will do -- in a file under
 `xymonserver.d/`, then remove `DISABLED` from the task. The API's own task

@@ -22,7 +22,7 @@ server-modules: fastapi uvicorn yaml
 task: xymonapi.tasks.DIST
 conf: xymonapi-apache.conf xymonapi-nginx.conf xymonapi-lighttpd.conf
 restart: app.py
-installed: Installed. Enable the API: remove DISABLED from @TASKDIR@/xymonapi. For other machines, include one of
+installed: Installed. Enable the API: remove DISABLED from @TASKDIR@/xymonapi.cfg. For other machines, include one of
 installed:   @ETC@/xymonapi-{apache,nginx,lighttpd}.conf in the web server, or give the API xymond's certificate: see xymonapi(8).
 uninstalled: Uninstalled xymonapi. Kept, for you to remove: @ETC@/xymonapi-{apache,nginx,lighttpd}.conf --
 uninstalled:   take its Include out of the web server first -- and the tokens file, $XYMONAPI_TOKENS
