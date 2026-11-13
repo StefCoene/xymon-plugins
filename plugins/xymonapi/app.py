@@ -594,6 +594,11 @@ def build_app() -> FastAPI:
         finally:
             REQUEST_ID.reset(reset)
         response.headers["X-Request-Id"] = rid
+        # The pages' files are asked for again each time, and answered 304
+        # while they are the same: without this a browser goes on using a
+        # stylesheet or a script it kept, after the file was replaced.
+        if request.url.path.startswith("/xymon/ui/"):
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
     return app
