@@ -464,8 +464,9 @@ def build_app() -> FastAPI:
     async def _framework_error(request, exc):
         error = {400: "bad_request", 401: "unauthorized", 404: "not_found",
                  405: "method_not_allowed"}.get(exc.status_code, "bad_request")
+        # Starlette before 0.19 gives its HTTPException no headers.
         return JSONResponse({"error": error, "detail": str(exc.detail)},
-                            status_code=exc.status_code, headers=exc.headers)
+                            status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
     try:
         n = xymon.load_hide()
@@ -609,6 +610,12 @@ def main(argv: list[str]) -> int:
         @contextlib.contextmanager
         def capture_signals(self):
             yield
+
+        # The same, for uvicorn before 0.29, which takes the signals here
+        # and for good: the server started last would be the only one a
+        # SIGTERM stops, and the process would stay.
+        def install_signal_handlers(self):
+            pass
 
     servers: list[tuple[Server, socket.socket]] = []
     try:
