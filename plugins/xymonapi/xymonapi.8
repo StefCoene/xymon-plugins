@@ -60,11 +60,25 @@ is none.
 .IP "\fB/states\fR [\fBentity\fR=HOST] [\fBtest\fR=TEST] [\fBverdict\fR=VERDICT]"
 The status board, one state per host and test. The colour is given as a
 verdict: green is ok, yellow warning, red critical, blue disabled, clear
-nodata and purple unknown.
+nodata and purple unknown. A state carries \fBacknowledged\fR while an
+acknowledgement runs, and \fBdisabled\fR while the test is disabled; neither
+is there otherwise.
 .IP "\fB/alarms\fR"
 Every state whose verdict is not ok.
 .IP "\fB/entities\fR"
 Each host on the board, once.
+.IP "\fB/pages\fR"
+The pages of
+.I hosts.cfg(5),
+which xymond does not keep: the top page with its subpages inside it, each
+with its name, its title, its path from the top, and its groups; a group
+with its title, its hosts in the file's order, and the columns of a
+group-only or a group-except; a title line as the pretitle of the page or
+group after it. The hosts a page lists before any group are a group with
+no title. Beside them, by host name, what the file says of a host: the
+NAME, COMMENT and DESCR tags. A host with nodisp is in no group. The file
+is asked of xymond, with its includes followed, so it is the one xymond
+runs with.
 .IP "\fB/status\fR \fBentity\fR=HOST \fBtest\fR=TEST"
 The current status of HOST's TEST, from xymondboard: its verdict, when it
 last changed (time) and was last reported (updated), and its text -- what
@@ -123,7 +137,9 @@ what a host has, list $XYMONRRDS/HOST/ there, or run rrdtool info on a file.
 .IP "\fB/graphs\fR \fBentity\fR=HOST \fBtest\fR=TEST [\fBfrom\fR=TIME] [\fBto\fR=TIME]"
 The graph
 .I showgraph.cgi(1)
-draws for HOST and TEST, fetched from showgraph.sh, its wrapper, at
+draws for HOST and TEST. The API runs that program itself, as the web
+server would, where $XYMONHOME/bin/showgraph.cgi is: the graph then needs
+no web server. Otherwise it is fetched from showgraph.sh, its wrapper, at
 $XYMONSERVERCGIURL -- prefixed with $XYMONWEBHOST when that is a path, as
 xymonserver.cfg ships it.
 .IP "\fB/events\fR [\fBentity\fR=HOST] [\fBtest\fR=TEST] [\fBsince\fR=TIME] [\fBlimit\fR=N] [\fBbefore\fR=SECONDS]"
@@ -209,10 +225,15 @@ The Xymon server to ask. It is required; xymonapi does not fall back to
 The xymon client program.
 .IP "\fBXYMONRRDS\fR"
 Where the RRD files are, for /series.
+.IP "\fBXYMONAPI_SHOWGRAPH\fR"
+The program /graphs runs to draw a graph: $XYMONHOME/bin/showgraph.cgi
+unless another is named. Set empty, or when the program is not there, the
+graph is fetched from the web server instead.
 .IP "\fBXYMONSERVERCGIURL\fR, \fBXYMONWEBHOST\fR"
-Where showgraph.cgi is, for /graphs. The first is usually a path, /xymon-cgi;
-the second, http://$XYMONSERVERWWWNAME, then gives the host, and must carry
-the port when the web server is not on 80.
+Where showgraph.sh is, for a /graphs that fetches the graph from the web
+server. The first is usually a path, /xymon-cgi; the second,
+http://$XYMONSERVERWWWNAME, then gives the host, and must carry the port
+when the web server is not on 80.
 .IP "\fBXYMONHISTDIR\fR, \fBXYMONHISTLOGS\fR"
 Where xymond_history keeps the events and the saved status texts, for
 /events and /histlog.
@@ -271,6 +292,13 @@ a command line; a line such as \fBpassword=\\S+\fR keeps it off the API,
 whatever the web page shows. Read at start: an expression that is not one,
 or a file that cannot be read, stops the API from starting, since running
 without the hiding asked for would be worse than not running.
+.IP "\fBXYMONAPI_UI\fR"
+A directory of web pages that read the API, served at /xymon/ui/ beside it,
+so that one address gives both: $XYMONHOME/ext/xymon-ui when that exists,
+unless another is named; set empty, none. The pages are behind the same
+password check as the API, and are sent with Cache-Control: no-cache, so a
+browser asks again after they were replaced. A name that is no directory
+stops the API from starting.
 .IP "\fBXYMONAPI_ASK\fR"
 Set to 1, /ask is there; unset, empty, 0, no, off or false, it is not.
 It needs xymonapi-agent installed beside the API (\fB./install.sh install-server xymonapi-agent\fR),
