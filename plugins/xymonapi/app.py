@@ -60,6 +60,7 @@ log = logging.getLogger("xymonapi")
 
 SPEC_PATH = Path(__file__).resolve().parent / "openapi.yaml"
 RAG_DIR = Path(__file__).resolve().parent.parent / "xymonapi-rag"
+UI_DIR = Path(__file__).resolve().parent.parent / "xymon-ui"
 
 
 def _rag():
@@ -175,6 +176,14 @@ def _entities(request):
     except Exception as exc:                        # noqa: BLE001
         return _upstream(exc)
     return JSONResponse({"items": items})
+
+
+def _pages(request):
+    try:
+        tree = xymon.pages()
+    except Exception as exc:                        # noqa: BLE001
+        return _upstream(exc)
+    return JSONResponse(tree)
 
 
 def _status(request):
@@ -439,6 +448,7 @@ ROUTES = {
     "/states": _states,
     "/alarms": _alarms,
     "/entities": _entities,
+    "/pages": _pages,
     "/status": _status,
     "/series": _series,
     "/graphs": _graphs,
@@ -553,6 +563,19 @@ def build_app() -> FastAPI:
     app.add_route(base + "/tokens", _tokens, methods=["GET", "POST"])
     app.add_route(base + "/tokens/{client}", _token, methods=["DELETE"])
     app.openapi = lambda: spec                      # type: ignore[assignment]
+
+    # The web pages that read this API, served beside it at /xymon/ui/ so
+    # that one address gives both and a browser needs no second origin:
+    # XYMONAPI_UI names their directory, or it is xymon-ui beside the
+    # plugins when that exists; set empty, none. Behind the password check
+    # like everything else.
+    ui = os.environ.get("XYMONAPI_UI", str(UI_DIR) if UI_DIR.is_dir() else "")
+    if ui:
+        if not os.path.isdir(ui):
+            sys.exit(f"xymonapi: XYMONAPI_UI={ui} is not a directory")
+        from starlette.staticfiles import StaticFiles
+        app.mount("/xymon/ui", StaticFiles(directory=ui, html=True), name="ui")
+        log.info("serving the web pages in %s at /xymon/ui/", ui)
 
     # Added last, so outermost: every answer gets its X-Request-Id, a refusal
     # of the password check and a framework 404 or 405 included, and every log

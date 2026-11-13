@@ -32,7 +32,7 @@ XYMONSERVERCGIURL = os.environ.get("XYMONSERVERCGIURL", "").rstrip("/")
 XYMONWEBHOST = os.environ.get("XYMONWEBHOST", "").rstrip("/")
 XYMONHISTDIR = os.environ.get("XYMONHISTDIR", "")
 XYMONHISTLOGS = os.environ.get("XYMONHISTLOGS", "")
-BOARD_FIELDS = ["hostname", "testname", "color", "lastchange"]
+BOARD_FIELDS = ["hostname", "testname", "color", "lastchange", "acktime", "disabletime"]
 
 # A name from the request becomes part of a file path, so it may not hold
 # "/" or "..": a path outside XYMONRRDS. A host name never holds ":" either;
@@ -104,6 +104,21 @@ def _iso(epoch: str) -> str | None:
         return None
 
 
+def _acked(acktime: str) -> bool:
+    """Whether an acknowledgement is running: xymond clears one that ran out
+    only when the next status arrives, so the time is compared with now."""
+    return bool(_DIGITS.fullmatch(acktime)) and int(acktime) > time.time()
+
+
+def _disabled(disabletime: str) -> bool:
+    """Whether a test is disabled: until a time still ahead, or -1, until it
+    is ok again. Like an acknowledgement, a time that has passed stays on
+    the board until the next status."""
+    if disabletime == "-1":
+        return True
+    return bool(_DIGITS.fullmatch(disabletime)) and int(disabletime) > time.time()
+
+
 def states(entity: str | None = None, test: str | None = None,
            verdict: str | None = None) -> list[dict]:
     """One State per host and test on the board."""
@@ -115,6 +130,13 @@ def states(entity: str | None = None, test: str | None = None,
         t = _iso(d.get("lastchange", ""))
         if t:
             st["time"] = t
+        # Present only when true, as /status reports them: an
+        # acknowledgement while it runs, a test disabled by hand or blue
+        # from a DOWNTIME tag.
+        if _acked(d.get("acktime", "")):
+            st["acknowledged"] = True
+        if d.get("color") == "blue" or _disabled(d.get("disabletime", "")):
+            st["disabled"] = True
         out.append(st)
     if entity:
         out = [s for s in out if s["entity"] == entity]
@@ -150,6 +172,99 @@ def entities() -> list[dict]:
         seen.setdefault(host, {"id": host, "composition": "measured",
                                "labels": {"role": "host"}})
     return list(seen.values())
+
+
+# --- Pages -------------------------------------------------------------------
+# The layout of the web pages -- which page a host is on, in which group,
+# with which columns -- is in hosts.cfg and nowhere else: xymond keeps a
+# host's page, not the groups. xymond's own "config hosts.cfg" gives the
+# file with its includes followed, as xymongen reads it, on every Xymon
+# since 4.2.
+_QUOTED = re.compile(r'"([^"]*)"|(\S+)')
+_HOSTLINE = re.compile(r"([0-9A-Fa-f:.]+)\s+(\S+)\s*(?:#\s*(.*))?")
+_TAG = re.compile(r'(NAME|COMMENT|DESCR):(?:"([^"]*)"|(\S*))')
+
+
+def _page(name: str, title: str | None, path: str) -> dict:
+    return {"name": name, "title": title, "path": path, "groups": [], "pages": []}
+
+
+def _columns(spec: str) -> list[str]:
+    return [c for c in spec.split("|") if c]
+
+
+def pages() -> dict:
+    """The page tree of hosts.cfg: {"root": Page, "hosts": {name: {...}}}.
+
+    A Page is {"name", "title", "path", "groups": [...], "pages": [...]};
+    the root is the top page, with name and path "". A group is {"title",
+    "hosts": [...]} with "only" or "except", a list of columns, for
+    group-only and group-except, and "pretitle" for a title line above it.
+    The hosts a page lists before any group are a group with no title.
+    A host with the nodisp tag is on no page."""
+    root = _page("", None, "")
+    by_name: dict[str, dict] = {}
+    hosts: dict[str, dict] = {}
+    page, top, group, pretitle = root, root, None, None
+
+    def child(parent: dict, name: str, title: str | None) -> dict:
+        nonlocal pretitle
+        p = _page(name, title or None, f"{parent['path']}/{name}" if parent["path"] else name)
+        if pretitle:
+            p["pretitle"], pretitle = pretitle, None
+        parent["pages"].append(p)
+        by_name[name] = p
+        return p
+
+    for raw in query("config hosts.cfg").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        word, _, rest = line.partition(" ")
+        if "\t" in word:
+            word, _, rest = line.partition("\t")
+        rest = rest.strip()
+        if word in ("page", "vpage"):
+            name, _, title = rest.partition(" ")
+            page = top = child(root, name, title.strip())
+            group = None
+        elif word in ("subpage", "vsubpage"):
+            name, _, title = rest.partition(" ")
+            page = child(top, name, title.strip())
+            group = None
+        elif word in ("subparent", "vsubparent"):
+            parent, _, more = rest.partition(" ")
+            name, _, title = more.strip().partition(" ")
+            # A parent not seen yet: under the current top page, as a subpage.
+            page = child(by_name.get(parent, top), name, title.strip())
+            group = None
+        elif word == "title":
+            pretitle = rest
+        elif word.startswith("group"):
+            group = {"title": None, "hosts": []}
+            if word.endswith("-only") or word.endswith("-except"):
+                cols, _, rest = rest.partition(" ")
+                group["only" if word.endswith("-only") else "except"] = _columns(cols)
+            group["title"] = rest.strip() or None
+            if pretitle:
+                group["pretitle"], pretitle = pretitle, None
+            page["groups"].append(group)
+        else:
+            m = _HOSTLINE.fullmatch(line)
+            if not m or m.group(2).startswith(".") or not _NAME.fullmatch(m.group(2)):
+                continue                # include, dispinclude, a .default. line, anything else
+            host, tags = m.group(2), m.group(3) or ""
+            words = {a or b for a, b in _QUOTED.findall(_TAG.sub("", tags))}
+            info = hosts.setdefault(host, {})
+            for key, quoted, bare in _TAG.findall(tags):
+                info[{"NAME": "name", "COMMENT": "comment", "DESCR": "description"}[key]] = quoted or bare
+            if "nodisp" in words or "NODISP" in words:
+                continue
+            if group is None:
+                group = {"title": None, "hosts": []}
+                page["groups"].append(group)
+            group["hosts"].append(host)
+    return {"root": root, "hosts": hosts}
 
 
 _STATUS_FIELDS = ["hostname", "testname", "color", "lastchange", "logtime",
