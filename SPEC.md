@@ -169,6 +169,25 @@ removal that fails stops the install. A name with a `/`, `.` or `..`, in
 a plugin's files or in `needs:`, or a plugin file that is a link, stops
 the install before anything is copied.
 
+**S20. An installed plugin keeps its `PLUGIN` file, and is managed by it.**
+An install copies the plugin's `PLUGIN` file into its installed directory,
+beside `VERSION`, and keeps its manual page there too, linked from
+`MANDIR`. Uninstalling, enabling, disabling, reporting `status` and
+checking what needs a plugin, and in what order to remove several, read
+that copy, not the checkout's, so that a checkout of another version, or
+one the plugin is gone from, still removes what was installed: its
+directory, its command, its manual page, its task link or the task file in
+the link's place. An action given no names covers the plugins installed
+with a copy that the checkout no longer has. An update reads the copy
+before replacing it, and removes the command, manual page and task link
+the installed version put in place and the new one does not. A plugin
+installed before the copy existed is managed by the checkout's `PLUGIN`
+file, as before, until it is installed again. The copy lies in a directory
+the Xymon user can write, so it decides nothing alone: a manual page is
+removed only if it is the link into the plugin's directory, a command only
+if it is, byte for byte, the one an install of that plugin wrote, and a
+name only if it is a plain file name.
+
 ### Knowing what is installed
 
 **S15. `status` says what is installed.**

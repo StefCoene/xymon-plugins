@@ -76,7 +76,7 @@ server_tree "$work/server"
 run install-server "$work/server"
 [ "$rc" -eq 0 ] || fail "[S18] a server's tree with a client's files beside: install-server failed: $out"
 assert_file_exists "$work/server/ext/xymonapi/VERSION"
-m=$(first_line "$(find "$man" -type f -name 'xymonapi.*')")
+m=$(first_line "$(find "$man" -name 'xymonapi.*')")
 [ -n "$m" ] || fail "install-server installed no manual page under $man"
 
 # A mistyped XYMONHOME removes nothing: not the manual page the real
