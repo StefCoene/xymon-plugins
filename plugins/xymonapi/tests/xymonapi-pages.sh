@@ -16,8 +16,11 @@
 #   - group-only and group-except give their columns, and a title line is
 #     the pretitle of what follows it;
 #   - NAME, COMMENT and DESCR, quoted or not, are the host's name, comment
-#     and description; a host with nodisp is in no group; the .default. line
-#     is no host.
+#     and description, and a title line above a host its pretitle; a host
+#     with nodisp is in no group; the .default. line is no host;
+#   - as xymongen does, a subpage before any page and a subparent whose
+#     parent page has not come yet are left out, and the hosts after them
+#     stay in the group they were in.
 #
 # Without a xymond to ask, /pages is the upstream error and not an empty
 # layout.
@@ -47,12 +50,14 @@ mkdir -p "$work/home/etc" "$work/home/tmp" "$work/home/www"
 cat > "$work/home/etc/hosts.cfg" <<EOF
 0.0.0.0		.default.	# CLIENT:noconn
 10.0.0.1	top1.example.com	# noconn COMMENT:"On the top page"
+subpage early Early
 
 title Production
 page servers Servers
 group-compress Web servers
 10.0.0.11	web1.example.com	# noconn NAME:"web one" DESCR:frontend
 group-only cpu|disk Databases
+title Primary
 10.0.0.21	db1.example.com		# noconn
 group-except info|trends Rest
 10.0.0.22	db2.example.com		# noconn
@@ -70,6 +75,8 @@ group Routers
 
 subparent servers bsd BSD
 10.0.0.41	bsd1.example.com	# noconn
+subparent nosuch orphan Orphan
+10.0.0.42	orphan1.example.com	# noconn
 
 include $work/home/etc/extra.cfg
 EOF
@@ -123,7 +130,13 @@ assert_contains '"pretitle":"Production"' "$pages" "and of the page after it"
 # What hosts.cfg says of a host.
 assert_contains '"web1.example.com":{"name":"web one","description":"frontend"}' "$pages" "NAME, quoted, and DESCR"
 assert_contains '"top1.example.com":{"comment":"On the top page"}' "$pages" "COMMENT"
-assert_contains '"db1.example.com":{}' "$pages" "a host hosts.cfg says nothing of"
+assert_contains '"db2.example.com":{}' "$pages" "a host hosts.cfg says nothing of"
+assert_contains '"db1.example.com":{"pretitle":"Primary"}' "$pages" "a title line above a host is that host's pretitle"
+
+# What xymongen leaves out.
+assert_not_contains '"name":"early"' "$pages" "a subpage before any page is left out"
+assert_not_contains '"name":"orphan"' "$pages" "a subparent whose parent page has not come is left out"
+assert_contains '"hosts":["bsd1.example.com","orphan1.example.com"]' "$pages" "and the host after it stays in the group it was in"
 
 # Without xymond there is no layout to give: an error, not an empty one.
 stop_process "$XYMOND_PID"

@@ -201,11 +201,17 @@ def pages() -> dict:
     "hosts": [...]} with "only" or "except", a list of columns, for
     group-only and group-except, and "pretitle" for a title line above it.
     The hosts a page lists before any group are a group with no title.
-    A host with the nodisp tag is on no page."""
+    A host with the nodisp tag is on no page.
+
+    It is read as xymongen reads it (xymongen/loadlayout.c in Xymon): a
+    title line is the pretitle of the page, group or host after it; a
+    subpage before any page, and a subparent whose parent is no page seen
+    yet, are ignored, the hosts after them staying where they were; a
+    subparent's parent is the first page of that name."""
     root = _page("", None, "")
     by_name: dict[str, dict] = {}
     hosts: dict[str, dict] = {}
-    page, top, group, pretitle = root, root, None, None
+    page, top, group, pretitle = root, None, None, None
 
     def child(parent: dict, name: str, title: str | None) -> dict:
         nonlocal pretitle
@@ -213,7 +219,7 @@ def pages() -> dict:
         if pretitle:
             p["pretitle"], pretitle = pretitle, None
         parent["pages"].append(p)
-        by_name[name] = p
+        by_name.setdefault(name, p)
         return p
 
     for raw in query("config hosts.cfg").splitlines():
@@ -229,14 +235,17 @@ def pages() -> dict:
             page = top = child(root, name, title.strip())
             group = None
         elif word in ("subpage", "vsubpage"):
+            if top is None:
+                continue                # no page yet: xymongen ignores it
             name, _, title = rest.partition(" ")
             page = child(top, name, title.strip())
             group = None
         elif word in ("subparent", "vsubparent"):
             parent, _, more = rest.partition(" ")
+            if parent not in by_name:
+                continue                # no such page yet: xymongen ignores it
             name, _, title = more.strip().partition(" ")
-            # A parent not seen yet: under the current top page, as a subpage.
-            page = child(by_name.get(parent, top), name, title.strip())
+            page = child(by_name[parent], name, title.strip())
             group = None
         elif word == "title":
             pretitle = rest
@@ -260,6 +269,8 @@ def pages() -> dict:
                 info[{"NAME": "name", "COMMENT": "comment", "DESCR": "description"}[key]] = quoted or bare
             if "nodisp" in words or "NODISP" in words:
                 continue
+            if pretitle:
+                info["pretitle"], pretitle = pretitle, None
             if group is None:
                 group = {"title": None, "hosts": []}
                 page["groups"].append(group)

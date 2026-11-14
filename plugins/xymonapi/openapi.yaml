@@ -146,6 +146,7 @@ paths:
                         name:        { type: string, description: "The NAME tag: what the pages show instead of the host name." }
                         comment:     { type: string, description: "The COMMENT tag." }
                         description: { type: string, description: "The DESCR tag." }
+                        pretitle:    { type: string, description: "The title line above the host in hosts.cfg: a heading inside its group." }
         "502": { $ref: "#/components/responses/Upstream" }
 
   /status:
