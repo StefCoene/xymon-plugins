@@ -75,7 +75,8 @@ start_api() {
 		API_PORT=$(free_port) || fail "no free port for the API"
 		# The index /search reads: the test's own, never the one in this
 		# user's cache, which a developer's machine may well have.
-		XYMONAPI_LISTEN="127.0.0.1:$API_PORT" XYMONAPI_RAG_INDEX="${XYMONAPI_RAG_INDEX:-$work/no-index.npz}" \
+		# No relay socket unless a test asks for one.
+		XYMONAPI_LISTEN="127.0.0.1:$API_PORT" XYMONAPI_RELAY_SOCKET="${XYMONAPI_RELAY_SOCKET:-}" XYMONAPI_RAG_INDEX="${XYMONAPI_RAG_INDEX:-$work/no-index.npz}" \
 			"${API_ROOT:-$ROOT/plugins/xymonapi}/xymonapi.sh" > "$work/api.log" 2>&1 &
 		API_PID=$!
 		deadline=$(( $(date +%s) + 60 ))

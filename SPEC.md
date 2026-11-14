@@ -141,12 +141,16 @@ The removal keeps the API's tokens file, and says what it kept.
 
 **S16. A plugin's web server snippet lives in its directory.**
 A snippet the `conf:` line of `PLUGIN` names is installed in `ext/NAME/`,
-and the web server is told to include it in a way that skips it once it is
-gone: `IncludeOptional` on Apache, a wildcard `include` on nginx and
-lighttpd. Removing the plugin, or deleting `ext/NAME`, removes it, and the
-web server still starts. A snippet an older install wrote in `etc/` is left
-there, since a web server may still include it, and copied, edits and all,
-into `ext/NAME` by the next install, which says so.
+`@XYMONHOME@` in it filled in as in the task file, and the web server is
+told to include it in a way that skips it once it is gone: `IncludeOptional`
+on Apache, a wildcard `include` on nginx and lighttpd. Removing the plugin,
+or deleting `ext/NAME`, removes it, and the web server still starts. A
+snippet an install finds as an older
+version shipped it, by the cksum its `PLUGIN` file's `conf-stock:` lines
+give -- its `$XYMONHOME` put back as `@XYMONHOME@`, so that one installed
+under any tree is recognised -- was never edited, and takes this version's;
+one that differs from this version's is the administrator's, kept, and the
+install says it differs.
 
 **S13. A plugin is on when its link is there.**
 A plugin's task is on when `etc/tasks.d/NAME` links to its task file, and

@@ -5,6 +5,35 @@ its version, what breaks, and what to do. Every other change needs nothing
 but installing the new code (see each plugin's README). CI refuses a change
 that breaks the API's contract without a line here.
 
+## The web server reaches the API on its relay socket, from xymonapi 4.0.0
+
+The API now also answers on a Unix socket for the web server,
+`$XYMONHOME/tmp/xymonapi-relay/relay.sock` (`XYMONAPI_RELAY_SOCKET`), in plain
+HTTP whether port 1986 speaks HTTPS or not, asking the same password or
+token; the web server's snippets pass `/xymon/api/` there. Before, they
+passed it to `127.0.0.1:1986` in plain HTTP, which failed with a 502 where
+1986 speaks HTTPS, as it does by itself once xymond's certificate is in
+`etc/tls/`. An install replaces a snippet it finds as an older version
+shipped it; one you edited is kept, and the install says it differs: put the new
+`ProxyPass`, `proxy_pass` or `proxy.server` line in it, from the snippet
+the plugin ships. The snippets need Apache 2.4.7, or lighttpd
+1.4.36, or later. An SSH tunnel can go to the socket too:
+`ssh -L 1986:$XYMONHOME/tmp/xymonapi-relay/relay.sock HOST`.
+
+What breaks: a path with a trailing slash, which redirected to the one
+without, is now not_found -- a redirect would send a client behind a web
+server back to http://. And there is no relay where the socket's
+directory, or one on the way to it, can be changed by anyone but root and
+the Xymon user: the API runs on, says why in its log, and `/health` says
+`"relay": "refused"`; the log names the directory, and the group that may
+write it. On Homebrew, `/opt/homebrew`'s directories -- `opt`, `Cellar`,
+`var` -- are writable by the `admin` group, by Homebrew's design: set
+`XYMONAPI_RELAY_TRUSTED_GROUPS=admin` in `xymonserver.d/`, if every admin is
+trusted with the API's passwords.
+`XYMONAPI_RELAY_SOCKET` set empty turns the relay off.
+Under SELinux, as with Xymon's RPM on RHEL, Apache must be allowed to
+connect to the socket.
+
 ## Every install action names its side, install.sh from November 2026
 
 `./install.sh install`, `uninstall`, `venv`, `enable`, `disable` and
