@@ -73,12 +73,46 @@ PREFIX=${PREFIX:-$HOME/.local}
 PYTHON_GIVEN=${PYTHON:-}
 PYTHON=${PYTHON:-python3}
 
-EXTROOT=$DESTDIR$XYMONHOME/ext
-ETC=$DESTDIR$XYMONHOME/etc
-TASKDIR=$ETC/tasks.d
-TOOLSROOT=$DESTDIR$PREFIX/libexec/xymon-plugins
-BIN=$DESTDIR$PREFIX/bin
-TOOLSMAN1=$DESTDIR$PREFIX/share/man/man1
+# inside PATH -- where PATH, absolute and without DESTDIR, lies under
+# DESTDIR, each part followed inside it: a link to an absolute path taken
+# from DESTDIR, a relative one from where it lies, a .. stopping at
+# DESTDIR. Xymon's own staged install links $XYMONHOME/etc to INSTALLETCDIR,
+# /etc/xymon on Debian and with the RPM, and a packager may link any
+# directory of the stage the same way: followed as they are, such links
+# lead out of the stage into the build host's directories, and an install
+# under DESTDIR writes nothing outside it. A link that cannot be read, or
+# forty in a row, stops the run rather than be guessed at. Without
+# DESTDIR, PATH as it is. Run in $(...): its variables stay there.
+inside() {
+	if [ -z "$DESTDIR" ]; then printf '%s\n' "$1"; return; fi
+	rest=$1 cur= hops=0
+	while [ -n "$rest" ]; do
+		case $rest in /*) rest=${rest#/}; continue ;; esac
+		part=${rest%%/*}
+		if [ "$part" = "$rest" ]; then rest=; else rest=${rest#*/}; fi
+		case $part in
+			.) continue ;;
+			..) cur=${cur%/*}; continue ;;
+		esac
+		if [ -L "$DESTDIR$cur/$part" ]; then
+			hops=$((hops + 1))
+			[ "$hops" -le 40 ] || die "more than 40 links under DESTDIR at $cur/$part"
+			t=$(readlink "$DESTDIR$cur/$part") && [ -n "$t" ] || die "cannot read the link $DESTDIR$cur/$part"
+			case $t in /*) cur= ;; esac
+			rest=$t${rest:+/$rest}
+		else
+			cur=$cur/$part
+		fi
+	done
+	printf '%s\n' "$DESTDIR${cur:-/}"
+}
+
+EXTROOT=$(inside "$XYMONHOME/ext") || exit 1
+ETC=$(inside "$XYMONHOME/etc") || exit 1
+TASKDIR=$(inside "$XYMONHOME/etc/tasks.d") || exit 1
+TOOLSROOT=$(inside "$PREFIX/libexec/xymon-plugins") || exit 1
+BIN=$(inside "$PREFIX/bin") || exit 1
+TOOLSMAN1=$(inside "$PREFIX/share/man/man1") || exit 1
 # What other machines install from, which the API serves at /plugins: each
 # plugin installed on the server stages its directory here, as in the
 # repository, beside this script and LICENSE.
@@ -172,9 +206,10 @@ xymon_ok() {
 	CHECKED="$CHECKED $1"
 	for n in $(field "$1" needs); do xymon_ok "$n"; done
 	want=$(field "$1" xymon); [ -n "$want" ] || return 0
-	have=$("$DESTDIR$XYMONHOME/bin/xymon" --version 2>/dev/null | sed -n 's/^Xymon version \([0-9][0-9.]*[^ ]*\).*/\1/p')
+	xymon=$(inside "$XYMONHOME/bin/xymon") || exit 1
+	have=$("$xymon" --version 2>/dev/null | sed -n 's/^Xymon version \([0-9][0-9.]*[^ ]*\).*/\1/p')
 	if [ -z "$have" ]; then
-		echo "install.sh: $1 needs Xymon $want or newer, and the version of $DESTDIR$XYMONHOME/bin/xymon could not be read: not checked" >&2
+		echo "install.sh: $1 needs Xymon $want or newer, and the version of $xymon could not be read: not checked" >&2
 	elif older "$have" "$want"; then
 		[ -n "$FORCE" ] || die "$1 needs Xymon $want or newer, and this server's is $have: --force installs it anyway"
 		echo "install.sh: $1 needs Xymon $want or newer, and this server's is $have: installed anyway, as --force asks" >&2
@@ -188,7 +223,7 @@ xymon_ok() {
 # xymonserver.d/, where the plugins' settings go: a configuration kept from
 # before 4.3.31 would ignore them all, without a word.
 reads_d() {
-	c=$DESTDIR$XYMONHOME/etc/xymonserver.cfg
+	c=$(inside "$XYMONHOME/etc/xymonserver.cfg") || exit 1
 	[ -f "$c" ] || return 0
 	grep -q '^[[:space:]]*\(optional[[:space:]]\{1,\}\)\{0,1\}directory[[:space:]]\{1,\}\(.*/\)\{0,1\}xymonserver\.d/\{0,1\}[[:space:]]*$' "$c" && return 0
 	echo "install.sh: $c does not read xymonserver.d/, where the plugins' settings go: add the line" >&2
@@ -285,8 +320,9 @@ version() {
 }
 
 # manual PLUGIN PAGE DIR MANROOT FINAL -- the page kept in the plugin's
-# directory DIR, and linked from its section's directory under MANROOT; the
-# link names FINAL, that directory as installed, without DESTDIR. Removing
+# directory DIR, and linked from its section's directory under MANROOT,
+# without DESTDIR, found inside it; the link names FINAL, that directory as
+# installed, without DESTDIR too. Removing
 # the directory leaves a link that points nowhere, and a removal knows the
 # page is the plugin's by the link, not by what its record says.
 manual() {
@@ -294,8 +330,9 @@ manual() {
 	plain "$2" || die "$1's PLUGIN file names '$2' as its manual page, which is no file of its own directory"
 	[ ! -L "$ROOT/plugins/$1/$2" ] || die "$1's $2 is a link, which is not installed"
 	cp -f "$ROOT/plugins/$1/$2" "$3/$2" && chmod 644 "$3/$2" || exit 1
-	mkdir -p "$4/man${2##*.}" || exit 1
-	rm -f "$4/man${2##*.}/$2" && ln -s "$5/$2" "$4/man${2##*.}/$2" || exit 1
+	sec=$(inside "$4/man${2##*.}") || exit 1
+	mkdir -p "$sec" || exit 1
+	rm -f "$sec/$2" && ln -s "$5/$2" "$sec/$2" || exit 1
 }
 
 # declared PLUGINFILE -- the names a PLUGIN file gives to stage, one per
@@ -456,6 +493,7 @@ enable() {
 	[ -n "$(held "$EXTROOT" "$1" task)" ] || die "$1 has no task to enable"
 	[ -f "$EXTROOT/$1/tasks.cfg" ] || die "$1 is not installed in $EXTROOT"
 	ours "$1"
+	[ -L "$TASKDIR/$1" ] || [ ! -d "$TASKDIR/$1" ] || die "$TASKDIR/$1 is a directory, not $1's task: left alone"
 	[ -L "$TASKDIR/$1" ] && { echo "$1 is on already"; return 0; }
 	mkdir -p "$TASKDIR"
 	ln -s "$XYMONHOME/ext/$1/tasks.cfg" "$TASKDIR/$1" || exit 1
@@ -514,10 +552,11 @@ installed_tasks() {
 # directory gets the first time.
 conf() {
 	for c in $(field "$1" conf); do
+		old=$(inside "$XYMONHOME/etc/$c") || exit 1
 		if [ -f "$EXTROOT/.$1.$c" ]; then
 			mv "$EXTROOT/.$1.$c" "$EXTROOT/$1/$c" || exit 1
-		elif [ -f "$ETC/$c" ]; then
-			cp "$ETC/$c" "$EXTROOT/$1/$c" && chmod 644 "$EXTROOT/$1/$c" || exit 1
+		elif [ -f "$old" ]; then
+			cp "$old" "$EXTROOT/$1/$c" && chmod 644 "$EXTROOT/$1/$c" || exit 1
 			echo "$ETC/$c, an older install's, is copied to $EXTROOT/$1/$c and left where it is: include the new one with IncludeOptional, or a wildcard include on nginx, then remove the old one"
 		else
 			cp "$ROOT/plugins/$1/$c" "$EXTROOT/$1/" && chmod 644 "$EXTROOT/$1/$c" || exit 1
@@ -571,6 +610,10 @@ offer() {
 venv_auto() {
 	plugin=$1 root=$2 modules=$3 target=$4 note=$5
 	[ -n "$modules" ] || return 0
+	if [ -n "$DESTDIR" ]; then
+		echo "Under DESTDIR no virtualenv is made or used: on the installed system, ./install.sh $target makes one for $plugin's modules ($modules)."
+		return 0
+	fi
 	if [ -x "$root/venv/bin/python3" ]; then
 		missing=$("$root/venv/bin/python3" -c 'import importlib.util as u, sys; print(" ".join(m for m in sys.argv[1:] if u.find_spec(m) is None))' $modules)
 		[ -z "$missing" ] && return 0
@@ -612,6 +655,7 @@ venv_auto() {
 # it: what every launcher runs with when XYMONAPI_PYTHON names no other. Run
 # again, it adds the modules of a plugin installed since.
 venv() {
+	[ -z "$DESTDIR" ] || die "a virtualenv is made on the installed system, not under DESTDIR: run this there, without DESTDIR"
 	[ -d "$1" ] || die "nothing is installed in $1 yet"
 	[ -x "$1/venv/bin/python3" ] || "$PYTHON" -m venv "$1/venv" || exit 1
 	for r in "$1"/*/requirements.txt; do
@@ -628,6 +672,9 @@ install_server() {
 	for n in $(field "$1" needs); do known "$n"; install_server "$n"; done
 	[ -n "$(field "$1" server-files)" ] || die "$1 has nothing to install on the server"
 	ext=$EXTROOT/$1
+	# A link in the plugin directory's place is not the plugin's: removed,
+	# as fresh would, before anything is read or moved through it.
+	if [ -L "$ext" ]; then rm -f "$ext" || exit 1; fi
 	# What the install in place put outside its directory, by its record,
 	# for what this one no longer does.
 	was_manual=$(held "$EXTROOT" "$1" server-manual)
@@ -636,8 +683,11 @@ install_server() {
 	[ -z "$(field "$1" task)" ] || ours "$1"
 	# The task file an admin may have enabled, and the web server snippets
 	# an admin may have edited, outlive the directory.
+	# A link where one is set aside would take it elsewhere: removed first.
+	if [ -L "$EXTROOT/.$1.tasks.cfg" ]; then rm -f "$EXTROOT/.$1.tasks.cfg" || exit 1; fi
 	if [ -f "$ext/tasks.cfg" ]; then mv "$ext/tasks.cfg" "$EXTROOT/.$1.tasks.cfg" || exit 1; fi
 	for c in $(field "$1" conf); do
+		if [ -L "$EXTROOT/.$1.$c" ]; then rm -f "$EXTROOT/.$1.$c" || exit 1; fi
 		if [ -f "$ext/$c" ]; then mv "$ext/$c" "$EXTROOT/.$1.$c" || exit 1; fi
 	done
 	fresh "$ext" || exit 1
@@ -645,8 +695,8 @@ install_server() {
 	version "$1" "$ext"
 	record "$1" "$ext"
 	dist "$1"
-	[ "$was_manual" = "$(field "$1" server-manual)" ] || drop_manual "$was_manual" "$DESTDIR$MANDIR" "$XYMONHOME/ext/$1" ""
-	manual "$1" "$(field "$1" server-manual)" "$ext" "$DESTDIR$MANDIR" "$XYMONHOME/ext/$1"
+	[ "$was_manual" = "$(field "$1" server-manual)" ] || drop_manual "$was_manual" "$MANDIR" "$XYMONHOME/ext/$1" ""
+	manual "$1" "$(field "$1" server-manual)" "$ext" "$MANDIR" "$XYMONHOME/ext/$1"
 	[ -z "$was_task" ] || [ -n "$(field "$1" task)" ] || drop_task "$1"
 	task "$1"
 	conf "$1"
@@ -661,6 +711,7 @@ install_tools() {
 	for n in $(field "$1" needs); do known "$n"; install_tools "$n"; done
 	[ -n "$(field "$1" tools-files)" ] || die "$1 has nothing to install on your own machine"
 	dir=$TOOLSROOT/$1
+	if [ -L "$dir" ]; then rm -f "$dir" || exit 1; fi
 	was_manual=$(held "$TOOLSROOT" "$1" tools-manual)
 	was_command=$(held "$TOOLSROOT" "$1" command)
 	fresh "$dir" || exit 1
@@ -673,13 +724,14 @@ install_tools() {
 	[ "$was_command" = "$(field "$1" command)" ] || drop_command "$1" $was_command
 	set +f
 	[ "$was_manual" = "$(field "$1" tools-manual)" ] \
-		|| drop_manual "$was_manual" "$DESTDIR$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1" ""
+		|| drop_manual "$was_manual" "$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1" ""
 	set -- "$1" $(field "$1" command)
 	if [ $# -eq 3 ]; then
+		rm -f "$BIN/$2" || exit 1
 		wrapper "$1" "$3" > "$BIN/$2"
 		chmod 755 "$BIN/$2"
 	fi
-	manual "$1" "$(field "$1" tools-manual)" "$dir" "$DESTDIR$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1"
+	manual "$1" "$(field "$1" tools-manual)" "$dir" "$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1"
 	venv_auto "$1" "$TOOLSROOT" "$(field "$1" tools-modules)" venv-tools "$(field "$1" venv-note)"
 	DONE="$DONE $1"
 }
@@ -703,12 +755,13 @@ record() {
 }
 
 # drop_manual NAME MANROOT FINAL LEGACY -- remove the manual page NAME from
-# its section under MANROOT when it is the link an install made into FINAL,
+# its section under MANROOT, without DESTDIR, when it is the link an install made into FINAL,
 # the plugin's directory as installed; or, for an install from before the
 # record, LEGACY set, the page copied there, its name the checkout's.
 drop_manual() {
 	[ -n "$1" ] && plain "$1" || return 0
-	m=$2/man${1##*.}/$1
+	m=$(inside "$2/man${1##*.}") || exit 1
+	m=$m/$1
 	if [ -L "$m" ]; then
 		[ "$(readlink "$m")" = "$3/$1" ] && rm -f "$m"
 	elif [ -n "$4" ]; then
@@ -765,7 +818,7 @@ uninstall_server() {
 	t=$(held "$EXTROOT" "$1" task)
 	legacy=; [ -f "$EXTROOT/$1/PLUGIN" ] || legacy=1
 	rm -rf "$EXTROOT/$1" "$DIST/plugins/$1"
-	drop_manual "$m" "$DESTDIR$MANDIR" "$XYMONHOME/ext/$1" "$legacy"
+	drop_manual "$m" "$MANDIR" "$XYMONHOME/ext/$1" "$legacy"
 	[ -z "$t" ] || drop_task "$1"
 	if [ -f "$ROOT/plugins/$1/PLUGIN" ]; then say "$1" uninstalled; else echo "Uninstalled $1."; fi
 }
@@ -780,7 +833,7 @@ uninstall_tools() {
 	# shellcheck disable=SC2086
 	drop_command "$1" $c
 	set +f
-	drop_manual "$m" "$DESTDIR$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1" "$legacy"
+	drop_manual "$m" "$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1" "$legacy"
 	if [ -f "$ROOT/plugins/$1/PLUGIN" ]; then say "$1" uninstalled-tools; else echo "Uninstalled $1."; fi
 }
 
@@ -826,6 +879,9 @@ case $ACTION in
 		for n in $LIST; do status tools "$TOOLSROOT" "$n"; done ;;
 	uninstall-server)
 		need_home
+		# The stage served at /plugins, pruned first, as an install does:
+		# a link there would take the removal elsewhere.
+		prune_dist
 		[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
 		for n in $(deepest_first "$EXTROOT"); do uninstall_server "$n"; done
 		[ -n "$NAMES" ] || rm -rf "$EXTROOT/venv" ;;

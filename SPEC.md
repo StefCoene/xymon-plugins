@@ -188,6 +188,22 @@ removed only if it is the link into the plugin's directory, a command only
 if it is, byte for byte, the one an install of that plugin wrote, and a
 name only if it is a plain file name.
 
+**S21. Under `DESTDIR`, nothing is written outside it.**
+An install staged under `DESTDIR` writes only there. Xymon's own staged
+install may leave `$XYMONHOME/etc` as an absolute link to where its
+configuration goes once installed, `/etc/xymon` on Debian and with the
+RPM, and a packager may link any directory of the stage the same way.
+Every directory the install writes to or reads a setting from -- `ext/`,
+`etc/`, `tasks.d/`, `MANDIR`, `$PREFIX/libexec`, `$PREFIX/bin` -- is
+followed inside `DESTDIR`: a link to an absolute path from `DESTDIR`, a
+relative one from where it lies, a `..` stopping at `DESTDIR`, a chain of
+links each in turn, a link higher up the path as well as at its end; a
+link that cannot be read stops the run. Below those directories, a link in
+the place of a plugin's directory, of a file an update sets aside, or of
+the stage's `plugins/` is removed, never followed, and a command is
+written in place of a link, never through it. No virtualenv is made or
+used under `DESTDIR`: it belongs to the installed system.
+
 ### Knowing what is installed
 
 **S15. `status` says what is installed.**
