@@ -19,6 +19,7 @@ import json
 import os
 import re
 import socket
+import struct
 import subprocess
 import time
 import urllib.request
@@ -363,7 +364,7 @@ def graph(entity: str | None, test: str | None, frm: str, to: str) -> bytes:
                    "action": "view"})
     png = _showgraph(q)
     if png is not None:
-        return _png(png, "showgraph.cgi")
+        return _drawn(_png(png, "showgraph.cgi"), entity, test)
     if not XYMONSERVERCGIURL:
         raise Upstream("XYMONSERVERCGIURL is not set")
     # xymonserver.cfg gives XYMONSERVERCGIURL as a path, "/xymon-cgi": the
@@ -376,7 +377,16 @@ def graph(entity: str | None, test: str | None, frm: str, to: str) -> bytes:
         url = XYMONWEBHOST.rstrip("/") + "/" + url.lstrip("/")
     with urllib.request.urlopen(f"{url}/showgraph.sh?{q}", timeout=30) as r:
         png = r.read(_GRAPH_MAX + 1)
-    return _png(png, f"showgraph.sh at {url}")
+    return _drawn(_png(png, f"showgraph.sh at {url}"), entity, test)
+
+
+def _drawn(png: bytes, entity: str | None, test: str | None) -> bytes:
+    # For a test it has no RRD data for, showgraph draws a PNG of one pixel
+    # by one, with status 200: that is no graph, and answered as such. The
+    # size is in the IHDR chunk, which must come first.
+    if png[12:16] == b"IHDR" and struct.unpack(">II", png[16:24]) == (1, 1):
+        raise NotFound(f"showgraph has no graph of {test} for {entity}")
+    return png
 
 
 def _png(png: bytes, source: str) -> bytes:

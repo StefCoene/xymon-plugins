@@ -14,7 +14,8 @@
 # names the missing setting, not a stack trace.
 #
 # What comes back must be a PNG: showgraph.cgi answers an error as HTML with
-# status 200, and that is a 502, not an image. And a graph that takes long
+# status 200, and that is a 502, not an image. For a test without RRD data
+# it draws a PNG of one pixel, and that is a 404: no graph. And a graph that takes long
 # holds up its own request alone: /health answers meanwhile.
 #
 # The web server is tests/lib/fake-showgraph.py, which records the request
@@ -69,6 +70,9 @@ assert_contains 'service=tcp.http.web.example.com%3A8080%2C' "$(cat "$work/web.r
 
 assert_equal "502" "$(graph 'entity=html.example.com&test=conn')" "an HTML page from showgraph"
 assert_contains 'did not answer with a PNG' "$(cat "$work/graph")" "is refused, and the answer says why"
+
+assert_equal "404" "$(graph 'entity=empty.example.com&test=procs')" "a PNG of one pixel from showgraph"
+assert_contains '"not_found"' "$(cat "$work/graph")" "is no graph"
 
 # A graph that takes five seconds, and /health asked one second into it.
 graph 'entity=slow.example.com&test=conn' > "$work/slow.code" &
@@ -144,4 +148,4 @@ assert_equal "200" "$(graph 'entity=web.example.com&test=conn')" "/graphs with X
 assert_match '^/xymon-cgi/showgraph\.sh\?' "$(cat "$work/web.req")" "asks the web server"
 [ -e "$work/cgi.req" ] && fail "XYMONAPI_SHOWGRAPH set empty, and showgraph.cgi was run"
 
-pass "/graphs runs showgraph.cgi where it is, else reaches showgraph.sh through XYMONWEBHOST; it serves only a PNG, and a slow graph does not hold up /health"
+pass "/graphs runs showgraph.cgi where it is, else reaches showgraph.sh through XYMONWEBHOST; it serves only a PNG, one pixel of it is no graph, and a slow graph does not hold up /health"
