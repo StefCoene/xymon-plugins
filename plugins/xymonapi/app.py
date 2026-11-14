@@ -96,8 +96,14 @@ def _refused(exc: Exception) -> JSONResponse:
 # The handlers are plain functions, not coroutines: Starlette runs them in
 # its thread pool, so a slow xymond, rrdtool or showgraph holds up that one
 # request and not the event loop -- /health keeps answering meanwhile.
+# The web server's relay socket: disabled when none is asked for,
+# listening, or refused when its path is not the API's alone -- the log
+# says which directory and why; /health says only this word.
+RELAY = "disabled"
+
+
 def _health(request):
-    out: dict = {"alive": False, "search": _search_info()}
+    out: dict = {"alive": False, "search": _search_info(), "relay": RELAY}
     # The version of the code this process runs, which a client compares
     # with its own: here, behind the password.
     version = VERSION
@@ -455,7 +461,11 @@ def build_app() -> FastAPI:
                  "ENVFILE, or through xymoncmd")
     spec = yaml.safe_load(SPEC_PATH.read_text())
     base = spec["servers"][0]["url"].rstrip("/")
-    app = FastAPI(title=spec["info"]["title"], version=spec["info"]["version"])
+    # No redirect from a path with a trailing slash to one without: behind a
+    # web server the API cannot tell the scheme the client used, and would
+    # send it back to http:// -- its password with it. Such a path is one
+    # this document does not list: not_found (C2).
+    app = FastAPI(title=spec["info"]["title"], version=spec["info"]["version"], redirect_slashes=False)
 
     # A path that is none of ours, or a method a path does not take, is
     # answered by the framework with {"detail": ...}: put in the spec's form,
@@ -593,15 +603,20 @@ async def _local_app(scope, receive, send):
 
 
 def main(argv: list[str]) -> int:
-    """Serve the app on the address given and, with --socket, on a Unix socket
-    too: one process, two listeners, so that the socket's requests are told
-    apart by where they came in, and TLS, when on, is the port's alone."""
+    """Serve the app on the address given; with --relay-socket, on a Unix
+    socket for the web server's relay too, a password asked there; with
+    --socket, on a Unix socket for this machine's programs too, none asked.
+    One process, a listener each, so that the socket's requests are told
+    apart by where they came in, and TLS, when on, is the port's alone. No
+    listener reads X-Forwarded-*: behind a relay a client could name any
+    address as its own, and nothing here needs one."""
     import uvicorn
 
     ap = argparse.ArgumentParser(prog="xymonapi")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=1986)
     ap.add_argument("--socket", default="")
+    ap.add_argument("--relay-socket", default="")
     ap.add_argument("--ssl-certfile")
     ap.add_argument("--ssl-keyfile")
     args = ap.parse_args(argv)
@@ -621,8 +636,24 @@ def main(argv: list[str]) -> int:
                                    family=socket.AF_INET6 if ":" in args.host else socket.AF_INET)
     except OSError as e:
         sys.exit(f"xymonapi: cannot listen on {args.host}:{args.port}: {(e.strerror or str(e)).lower()}")
-    servers.append((Server(uvicorn.Config(app, access_log=False, ssl_certfile=args.ssl_certfile,
-                                          ssl_keyfile=args.ssl_keyfile)), tcp))
+    servers.append((Server(uvicorn.Config(app, access_log=False, proxy_headers=False,
+                                          ssl_certfile=args.ssl_certfile, ssl_keyfile=args.ssl_keyfile)), tcp))
+    global RELAY
+    bound = []
+    if args.relay_socket:
+        relay, at = _relay_socket(args.relay_socket)
+        if relay is None:
+            RELAY = "refused"
+            log.error("no relay socket at %s (XYMONAPI_RELAY_SOCKET): %s. The web server's relay to the API is "
+                      "unavailable, and unsafe to use while anyone else can sit at that path; the port and the "
+                      "other socket answer as ever. Make every directory on that path root's or this user's and "
+                      "written by no one else, or name a group trusted to write it in "
+                      "XYMONAPI_RELAY_TRUSTED_GROUPS, then restart the API.", args.relay_socket, at)
+        else:
+            RELAY = "listening"
+            bound.append(at)
+            servers.append((Server(uvicorn.Config(app, access_log=False, proxy_headers=False)), relay))
+            log.info("listening on the relay socket %s too, a password asked there", at)
     if args.socket:
         # Mode 660 in a directory of 750: the Xymon user and its group reach
         # it, and nobody else (xymonapi(8), XYMONAPI_SOCKET). A file left by
@@ -638,7 +669,7 @@ def main(argv: list[str]) -> int:
         uds.bind(args.socket)
         os.chmod(args.socket, 0o660)
         uds.listen(128)
-        servers.append((Server(uvicorn.Config(_local_app, access_log=False)), uds))
+        servers.append((Server(uvicorn.Config(_local_app, access_log=False, proxy_headers=False)), uds))
         log.info("listening on the socket %s too, with no password asked there", args.socket)
 
     def stop(sig, frame):
@@ -652,10 +683,125 @@ def main(argv: list[str]) -> int:
     try:
         asyncio.run(serve())
     finally:
-        if args.socket:
+        # Only what this run bound: never a file it found and refused.
+        for path in ([args.socket] if args.socket else []) + bound:
             with contextlib.suppress(OSError):
-                os.unlink(args.socket)
+                os.unlink(path)
+        # And the relay's directory, the API's own, once empty: removing the
+        # plugin leaves nothing behind it in $XYMONHOME/tmp.
+        for path in bound:
+            with contextlib.suppress(OSError):
+                os.rmdir(os.path.dirname(path))
     return 0
+
+
+# Groups the admin trusts with the relay's path, XYMONAPI_RELAY_TRUSTED_GROUPS,
+# names or numbers: a directory they may write is taken as safe -- on a
+# Homebrew install, admin, which may write /opt/homebrew/var. None by
+# default; no group is trusted for its name or number alone.
+def _trusted_groups() -> set[int]:
+    import grp
+    out = set()
+    for g in os.environ.get("XYMONAPI_RELAY_TRUSTED_GROUPS", "").replace(",", " ").split():
+        try:
+            out.add(int(g) if g.isdigit() else grp.getgrnam(g).gr_gid)
+        except (KeyError, ValueError):
+            log.error("XYMONAPI_RELAY_TRUSTED_GROUPS: no group %s", g)
+    return out
+
+
+def _safe_dir(st: os.stat_result, trusted: set[int]) -> bool:
+    """A directory no one but root, this user and a trusted group can change
+    the entries of: theirs, written by neither its group, unless trusted,
+    nor others -- or sticky, where only an entry's owner may rename or
+    remove it, as /tmp is."""
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid not in (0, os.getuid()):
+        return False
+    if st.st_mode & stat.S_ISVTX:
+        return True
+    return not st.st_mode & 0o002 and (not st.st_mode & 0o020 or st.st_gid in trusted)
+
+
+def _unsafe(p: str, st: os.stat_result) -> str:
+    """Why the directory P is not safe for the relay's path, naming the group
+    that may write it, which XYMONAPI_RELAY_TRUSTED_GROUPS could trust."""
+    if stat.S_ISDIR(st.st_mode) and st.st_uid in (0, os.getuid()) and not st.st_mode & 0o002:
+        import grp
+        try:
+            g = grp.getgrgid(st.st_gid).gr_name
+        except KeyError:
+            g = str(st.st_gid)
+        return (f"{p} is writable by group {g}: XYMONAPI_RELAY_TRUSTED_GROUPS={g} trusts it, "
+                f"if all of that group may see the API's passwords")
+    return f"{p} is not a directory only root or this user can change"
+
+
+def _relay_socket(path: str) -> tuple[socket.socket | None, str]:
+    """The Unix socket the web server relays the API to, and where it is
+    bound; or None and why not. The same app as the port, a password or
+    token asked.
+
+    Anyone on this machine may connect -- the socket is 666 -- as anyone may
+    reach the port. What matters is that no one else can be at that path in
+    the API's place, to be sent the web server's requests and their
+    passwords. So every directory on the way to it, as the web server
+    follows it -- each step of the path as written, a link owned by root or
+    this user, and each directory a link leads to -- is root's or this
+    user's and changed by no one else (or a trusted group), and the last,
+    the API's own, is made 755 whatever the umask. Where that does not
+    hold, there is no relay: the API runs on, its port and other socket as
+    ever, and says so, in its log and in /health -- stopping would not keep
+    the web server from relaying to that path, to whoever sits there."""
+    trusted = _trusted_groups()
+    lexical = os.path.dirname(os.path.abspath(path))
+    # Each step of the path as the web server follows it, from /.
+    p = "/"
+    for part in [x for x in os.path.dirname(lexical).split("/") if x]:
+        p = os.path.join(p, part)
+        try:
+            st = os.lstat(p)
+        except OSError as e:
+            return None, f"{p}: {e.strerror or e}"
+        if stat.S_ISLNK(st.st_mode):
+            if st.st_uid not in (0, os.getuid()):
+                return None, f"{p} is a link of another user's"
+        elif not _safe_dir(st, trusted):
+            return None, _unsafe(p, st)
+    # And each directory the links lead to.
+    parent = os.path.realpath(os.path.dirname(lexical))
+    p = parent
+    while True:
+        st = os.stat(p)
+        if not _safe_dir(st, trusted):
+            return None, f"where a link on the way leads, {_unsafe(p, st)}"
+        if p == os.path.dirname(p):
+            break
+        p = os.path.dirname(p)
+    d = os.path.join(parent, os.path.basename(lexical))
+    try:
+        os.mkdir(d, 0o755)
+    except FileExistsError:
+        pass
+    except OSError as e:
+        return None, f"cannot make {d}: {e.strerror or e}"
+    st = os.lstat(d)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid() or st.st_mode & 0o022:
+        return None, f"{d} is not a directory of this user's that no one else writes"
+    os.chmod(d, 0o755)
+    sock = os.path.join(d, os.path.basename(path))
+    with contextlib.suppress(FileNotFoundError):
+        if not stat.S_ISSOCK(os.lstat(sock).st_mode):
+            return None, f"{sock} is there, and not a socket"
+        os.unlink(sock)
+    s = socket.socket(socket.AF_UNIX)
+    try:
+        s.bind(sock)
+        os.chmod(sock, 0o666)
+        s.listen(128)
+    except OSError as e:
+        s.close()
+        return None, f"cannot listen on {sock}: {e.strerror or e}"
+    return s, sock
 
 
 if __name__ == "__main__":

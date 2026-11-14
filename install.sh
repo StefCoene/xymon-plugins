@@ -497,7 +497,7 @@ enable() {
 	[ -L "$TASKDIR/$1" ] && { echo "$1 is on already"; return 0; }
 	mkdir -p "$TASKDIR"
 	ln -s "$XYMONHOME/ext/$1/tasks.cfg" "$TASKDIR/$1" || exit 1
-	echo "$1 is on: xymonlaunch starts it within half a minute"
+	echo "$1 is on: xymonlaunch reads it within half a minute and starts it; one that keeps failing it holds for ten minutes after five restarts"
 }
 disable() {
 	[ -n "$(held "$EXTROOT" "$1" task)" ] || die "$1 has no task to disable"
@@ -546,20 +546,73 @@ installed_tasks() {
 # the web server includes in a way that skips a file that is not there --
 # Apache's IncludeOptional, a wildcard include for nginx -- so that removing
 # ext/PLUGIN takes them with it, and the web server still starts. The one an
-# admin edited is kept: install_server set it aside. A snippet an older
-# install put in $XYMONHOME/etc is left there, as a web server may still
-# include it, and its content, edits and all, is the one the plugin's
-# directory gets the first time.
+# admin edited is kept: install_server set it aside; one an older version
+# shipped, unedited, takes this version's.
+
+# stock PLUGIN SNIPPET -- the snippet as this version ships it, @XYMONHOME@
+# filled in, as the task file's is: what it names lies under the server's
+# tree, which only the install knows.
+stock() {
+	sed -e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g" "$ROOT/plugins/$1/$2"
+}
+
+# shipped PLUGIN SNIPPET FILE -- true when FILE is, byte for byte, the
+# snippet as an older version shipped it: its cksum is among the plugin's
+# conf-stock lines, as it is, or with $XYMONHOME put back as @XYMONHOME@ so
+# that the same snippet installed under any tree gives the same one. As it
+# is first: a snippet without @XYMONHOME@ is then recognised whatever the
+# tree, though $XYMONHOME may also be part of its text (/xymon in
+# /xymon/api/). Where that putting back cannot tell, the snippet is taken
+# for edited: kept, and said to differ, never overwritten.
+shipped() {
+	list="
+$(field "$1" conf-stock)
+"
+	sum=$(cksum < "$3" | cut -d' ' -f1,2)
+	case $list in *"
+$2 $sum
+"*) return 0 ;; esac
+	sum=$(awk -v h="$XYMONHOME" '{
+		out = ""; s = $0
+		while ((i = index(s, h)) > 0) { out = out substr(s, 1, i - 1) "@XYMONHOME@"; s = substr(s, i + length(h)) }
+		print out s
+	}' "$3" | cksum | cut -d' ' -f1,2)
+	case $list in *"
+$2 $sum
+"*) return 0 ;; esac
+	return 1
+}
+
+# same PLUGIN SNIPPET FILE -- true when FILE is this version's snippet. The
+# x keeps the last newlines a command substitution drops.
+same() {
+	[ "$(stock "$1" "$2"; echo x)" = "$(cat "$3"; echo x)" ]
+}
+
 conf() {
+	# The snippets name a path under $XYMONHOME; one a web server's
+	# configuration cannot take as it is is said, for the admin to write.
+	case $XYMONHOME in
+		*[!A-Za-z0-9._/+-]*) echo "The web server snippets in $EXTROOT/$1 name $XYMONHOME, which holds characters a web server's configuration may not take as they are: check the path in the snippet you include." ;;
+	esac
 	for c in $(field "$1" conf); do
-		old=$(inside "$XYMONHOME/etc/$c") || exit 1
+		dst=$EXTROOT/$1/$c
 		if [ -f "$EXTROOT/.$1.$c" ]; then
-			mv "$EXTROOT/.$1.$c" "$EXTROOT/$1/$c" || exit 1
-		elif [ -f "$old" ]; then
-			cp "$old" "$EXTROOT/$1/$c" && chmod 644 "$EXTROOT/$1/$c" || exit 1
-			echo "$ETC/$c, an older install's, is copied to $EXTROOT/$1/$c and left where it is: include the new one with IncludeOptional, or a wildcard include on nginx, then remove the old one"
+			mv "$EXTROOT/.$1.$c" "$dst" || exit 1
 		else
-			cp "$ROOT/plugins/$1/$c" "$EXTROOT/$1/" && chmod 644 "$EXTROOT/$1/$c" || exit 1
+			stock "$1" "$c" > "$dst" && chmod 644 "$dst" || exit 1
+			continue
+		fi
+		# A kept snippet an older version shipped, unedited, takes this
+		# version's; one that differs from it is the admin's, and kept,
+		# said to be.
+		if same "$1" "$c" "$dst"; then
+			:
+		elif shipped "$1" "$c" "$dst"; then
+			stock "$1" "$c" > "$dst" && chmod 644 "$dst" || exit 1
+			echo "$dst, an older version's as shipped, is replaced by this version's"
+		else
+			echo "$dst is kept as edited; this version's differs: compare it with $ROOT/plugins/$1/$c, @XYMONHOME@ being $XYMONHOME"
 		fi
 	done
 }

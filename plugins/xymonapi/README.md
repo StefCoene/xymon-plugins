@@ -116,10 +116,7 @@ Updating: install again. The install stops the running API, which would go
 on with the code it loaded, and says so; xymonlaunch starts the new.
 `./install.sh uninstall-server xymonapi` removes the snippets with the rest of
 `ext/xymonapi`, which the web server's optional include then skips, and keeps
-the tokens file, `$XYMONAPI_TOKENS`. A snippet an older install wrote in
-`$XYMONHOME/etc` is left there: the next install copies it, your edits with
-it, into `ext/xymonapi`, and says so; include the new one, then remove the
-old.
+the tokens file, `$XYMONAPI_TOKENS`.
 
 ## Asking in words: /ask
 
@@ -168,8 +165,8 @@ then given, in `xymonapi-connect`, `register` or `XYMONAPI_URL`: the scheme,
 the host and the port, without `/xymon/api/v1`, which the client library
 adds:
 
-- **Its own HTTPS.** Where xymond has a certificate for TLS (`xymon-tls(7)`,
-  from Xymon pull requests #617–#623, not yet merged), the API finds it in
+- **Its own HTTPS.** Where xymond has a certificate for TLS (`xymon-tls(7)`),
+  the API finds it in
   `etc/tls/` and speaks HTTPS by itself; or name any certificate and key in
   `XYMONAPI_TLS_CERT` and `_KEY`. Open the port with
   `XYMONAPI_LISTEN="0.0.0.0:1986"`. The URL: `https://xymon.example.ch:1986`.
@@ -184,9 +181,21 @@ adds:
   pages are at -- the same web server and the same port -- without the
   path: pages at `https://xymon.example.ch:8443/xymon/` mean the URL
   `https://xymon.example.ch:8443`, and pages at
-  `https://xymon.example.ch/xymon/` the URL `https://xymon.example.ch`.
+  `https://xymon.example.ch/xymon/` the URL `https://xymon.example.ch`. The
+  snippet passes the API to its relay socket,
+  `$XYMONHOME/tmp/xymonapi-relay/relay.sock` (`XYMONAPI_RELAY_SOCKET`), in
+  plain HTTP whether port 1986 speaks HTTPS or not; a password is asked
+  there as on the port. Apache 2.4.7, nginx, or lighttpd 1.4.36 or later.
+  Every directory on the way to the socket must be root's or the Xymon
+  user's and written by no one else, or the API runs without the relay and
+  `/health` says `"relay": "refused"`, the log naming the directory and its
+  group. On Homebrew, `/opt/homebrew`'s directories (`opt`, `Cellar`, `var`)
+  are writable by the `admin` group, by design:
+  `XYMONAPI_RELAY_TRUSTED_GROUPS=admin` in `xymonserver.d/` trusts it, if
+  every admin may see the API's passwords.
 - **An SSH tunnel**, for one person:
-  `ssh -L 1986:127.0.0.1:1986 xymon-server`. The URL:
+  `ssh -L 1986:/usr/lib/xymon/server/tmp/xymonapi-relay/relay.sock xymon-server`,
+  to the relay socket under the server's `$XYMONHOME`. The URL:
   `http://127.0.0.1:1986`, as if local.
 
 Plain HTTP across a network carries the password, the tokens and the status

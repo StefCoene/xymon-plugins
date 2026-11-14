@@ -78,9 +78,16 @@ if [ -n "$XYMONAPI_TLS_CERT$XYMONAPI_TLS_KEY" ] || [ -e "$cert" ] || [ -e "$key"
 	export XYMONAPI_TLS=1
 fi
 
+# The Unix socket the web server relays to, whatever the port speaks, so
+# that its snippets need not follow the certificates; a password is asked
+# there as on the port. XYMONAPI_RELAY_SOCKET, by default under
+# $XYMONHOME/tmp, where the snippets, written at install, look for it; set
+# empty, none.
+relay=${XYMONAPI_RELAY_SOCKET-${XYMONHOME:+$XYMONHOME/tmp/xymonapi-relay/relay.sock}}
+
 cd "$here" || exit 1
 # By its full path, as the task names it: a restart finds the API by its
 # directory in the command line, pkill -f "$XYMONHOME/ext/xymonapi/", which
 # a bare app.py would not show.
 # shellcheck disable=SC2086 # tls is two options and their files, or nothing
-exec "$PYTHON" "`pwd`/app.py" --host "$host" --port "$port" ${sock:+--socket "$sock"} $tls
+exec "$PYTHON" "`pwd`/app.py" --host "$host" --port "$port" ${sock:+--socket "$sock"} ${relay:+--relay-socket "$relay"} $tls

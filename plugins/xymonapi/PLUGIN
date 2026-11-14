@@ -2,7 +2,7 @@
 # it alone. One key per line, a key repeated for each line of a message;
 # ./install.sh at the repository's top installs it from the lines below.
 name: xymonapi
-version: 3.0.0
+version: 4.0.0
 side: server, client
 summary: a read-only HTTP and JSON interface to a Xymon server, as one of its xymonlaunch tasks, and its client
 requires: python >= 3.9
@@ -16,21 +16,28 @@ manual: xymonapi.8
 # executable lists the files made 755, the others 644; command is the
 # tools' command in $PREFIX/bin and the script it runs; task, conf and
 # restart are the server's xymonlaunch task, web server snippets kept once
-# written, and the program whose running process an install stops. The
+# written, and the program whose running process an install stops;
+# conf-stock a snippet as an earlier version shipped it, by its cksum, which
+# an install that finds it unedited replaces by this version's. The
 # messages may name @ETC@, @TASKDIR@ and @XYMONHOME@.
 server-files: app.py xymon.py xymonapi_client.py tokens.py openapi.yaml requirements.txt xymonapi.sh
 server-manual: xymonapi.8
 server-modules: fastapi uvicorn yaml
 task: xymonapi.tasks.DIST
 conf: xymonapi-apache.conf xymonapi-nginx.conf xymonapi-lighttpd.conf
+conf-stock: xymonapi-apache.conf 1882972170 1081
+conf-stock: xymonapi-apache.conf 2499290032 1179
+conf-stock: xymonapi-nginx.conf 2389928703 601
+conf-stock: xymonapi-nginx.conf 1328181808 656
+conf-stock: xymonapi-lighttpd.conf 451235396 617
+conf-stock: xymonapi-lighttpd.conf 1373871735 694
 restart: app.py
 installed: Installed. For other machines, include @XYMONHOME@/ext/xymonapi/xymonapi-{apache,nginx,lighttpd}.conf in the web server,
 installed:   so that it is skipped once gone -- IncludeOptional on Apache, a wildcard (xymonapi-nginx*.conf) on nginx and lighttpd --
 installed:   or give the API xymond's certificate: see xymonapi(8).
 installed: It starts only with its users' passwords: @ETC@/xymonpasswd, the web pages' own, or another file in XYMONAPI_PASSWD.
 uninstalled: Uninstalled xymonapi. Its web server snippets went with ext/xymonapi, which an IncludeOptional or a wildcard include skips.
-uninstalled:   Kept: the tokens file, $XYMONAPI_TOKENS ($XYMONVAR/xymonapi/tokens by default), and any snippet an older install
-uninstalled:   left in @ETC@, yours to remove once no Include names it.
+uninstalled:   Kept: the tokens file, $XYMONAPI_TOKENS ($XYMONVAR/xymonapi/tokens by default).
 tools-files: xymonapi_client.py xymonapi-connect.sh
 tools-manual: xymonapi-connect.1
 command: xymonapi-connect xymonapi-connect.sh

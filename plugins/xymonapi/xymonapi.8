@@ -1,4 +1,4 @@
-.TH XYMONAPI 8 "November 13, 2026" "xymon-plugins"
+.TH XYMONAPI 8 "November 14, 2026" "xymon-plugins"
 .SH NAME
 xymonapi \- read-only HTTP and JSON interface to the Xymon server
 .SH SYNOPSIS
@@ -31,9 +31,13 @@ exits with status 77.
 The OpenAPI description of every operation is served at /openapi.json, and
 is the file openapi.yaml beside the program.
 
-It has two doors. The port, 127.0.0.1:1986 by default, is for other
-machines, through the web server or an SSH tunnel: every request there
-needs a user's password or a client token (TOKENS). The Unix socket,
+It has three doors. The port, 127.0.0.1:1986 by default, in HTTPS when it
+has a certificate, is for other machines: every request there but /plugins
+needs a user's password or a client token (TOKENS). The relay socket,
+$XYMONHOME/tmp/xymonapi-relay/relay.sock by default, is the same in plain
+HTTP, for the web server and an SSH tunnel, whether the port speaks HTTPS
+or not: a password or token is needed there too (XYMONAPI_RELAY_SOCKET
+under ENVIRONMENT). The other Unix socket,
 $XYMONVAR/xymonapi/api.sock by default, is for the programs of the server
 itself: none is needed there, because only the Xymon user and its group
 may open it (XYMONAPI_SOCKET under ENVIRONMENT).
@@ -224,12 +228,41 @@ Where xymond_history keeps the events and the saved status texts, for
 The index /search reads, and the embedding model, as for xymonapi-rag(1),
 which writes the index with the same settings from the same file.
 .LP
-Twelve settings are its own. Put them in a file under
+Fourteen settings are its own. Put them in a file under
 \fBxymonserver.d/\fR beside xymonserver.cfg, which reads its files, for
 instance xymonapi.cfg:
 .IP "\fBXYMONAPI_LISTEN\fR"
 The address and port to listen on, as HOST:PORT or [ADDRESS]:PORT for IPv6.
 The default is 127.0.0.1:1986, which only this machine reaches.
+.IP "\fBXYMONAPI_RELAY_SOCKET\fR"
+The Unix socket the snippets under FILES pass /xymon/api/ to:
+$XYMONHOME/tmp/xymonapi-relay/relay.sock by default, the path the snippets
+are written with at install; none when set to the empty string. It speaks
+plain HTTP whether the port speaks HTTPS or not, so that the web server
+need not follow the certificates, and asks the same password or token. Any
+user of this machine may connect to it, mode 666, as any may reach the
+port; what keeps another program from sitting at that path in the API's
+place, to be sent the web server's requests and their passwords, is its
+directory, the API's own, made mode 755 whatever the umask, and every
+directory above it, followed through its links: each root's or the Xymon
+user's, and changed by no one else, or sticky as /tmp is; each step of the
+path as written, too, a link there being root's or the Xymon user's. Where
+that does not hold there is no relay: the API runs on, its port and other
+socket as ever, says which directory and why in its log, and /health says
+"relay": "refused" -- stopping would not keep the web server from relaying
+to that path, to whoever sits there. A group the admin trusts with that
+path, writing a directory on it, is named in
+\fBXYMONAPI_RELAY_TRUSTED_GROUPS\fR, names or numbers -- the log names the
+group that may write the directory refused: on a Homebrew install, admin,
+which may write /opt/homebrew's directories by design. No group is trusted for its name
+or number alone. Under SELinux the web server must be allowed to connect
+to the socket. Neither door reads
+X-Forwarded headers, and no path redirects to another: a trailing slash is
+not_found.
+.IP "\fBXYMONAPI_RELAY_TRUSTED_GROUPS\fR"
+Groups trusted with the relay socket's path, names or numbers: a directory
+on it that such a group may write is taken as safe (XYMONAPI_RELAY_SOCKET).
+None by default.
 .IP "\fBXYMONAPI_SOCKET\fR"
 The Unix socket for the programs of this machine: $XYMONVAR/xymonapi/api.sock
 by default, none when set to the empty string. A request through it needs
@@ -306,15 +339,19 @@ gives.
 .IP "\fB$XYMONHOME/ext/xymonapi/tasks.cfg\fR"
 The xymonlaunch task, on when \fB$XYMONHOME/etc/tasks.d/xymonapi\fR links to
 it. A later installation leaves it as it is, and whether it is on.
+xymonlaunch reads it within half a minute. After the API exits abnormally,
+xymonlaunch restarts it five times, at most one every five seconds; after
+six failed runs it holds it for just over ten minutes after its last
+start, saying so only when debugging.
 .IP "\fB$XYMONHOME/ext/xymonapi/xymonapi-apache.conf\fR, \fBxymonapi-nginx.conf\fR, \fBxymonapi-lighttpd.conf\fR"
 Snippets that serve the API through the web server, for other machines:
-/xymon/api/ passed to 127.0.0.1:1986, in the HTTPS part where the server
+/xymon/api/ passed to the relay socket, its path filled in at install, in the HTTPS part where the server
 has one. Include the one for your web server where its Xymon configuration
 is, in a way that skips it once it is gone: IncludeOptional on Apache, a
 wildcard include, xymonapi-nginx*.conf, on nginx and lighttpd. A later
-installation keeps your edits; removing ext/xymonapi removes them, and the
-web server still starts. One an older installation wrote in $XYMONHOME/etc
-is left there, and copied into ext/xymonapi by the next.
+installation keeps your edits, and replaces a snippet an older version
+shipped that it finds unedited; removing ext/xymonapi removes them, and the
+web server still starts.
 .IP "\fB$XYMONHOME/etc/xymonserver.d/\fR"
 A file of yours here holds the settings of its own listed under
 ENVIRONMENT. Nothing is installed there.
@@ -346,8 +383,9 @@ and its certificate are Xymon's own, files on the server.
 
 From other machines, use HTTPS: with xymond's certificate the API speaks it
 itself (XYMONAPI_TLS_CERT), and where the web server has a certificate the
-snippets under FILES pass /xymon/api/ to the API over it. An SSH tunnel to
-127.0.0.1:1986 is encrypted too, with nothing to set up. A client is given
+snippets under FILES pass /xymon/api/ to the API's relay socket over it.
+An SSH tunnel to the relay socket is encrypted too, with nothing to set up:
+ssh -L 1986:$XYMONHOME/tmp/xymonapi-relay/relay.sock HOST. A client is given
 the URL that reaches the API, scheme, host and port, without /xymon/api/v1,
 which it adds: https://HOST:1986 for the API's own HTTPS; the web server's,
 https://HOST, or https://HOST:PORT when its HTTPS port is not 443, for the
