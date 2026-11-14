@@ -38,6 +38,7 @@
 # needs another finds it beside itself; elsewhere they go under
 # $PREFIX/libexec/xymon-plugins/ the same way, with a command per plugin in
 # $PREFIX/bin. Each records its version beside its files, in VERSION, and
+# its PLUGIN file, by which it is uninstalled, enabled and updated later;
 # the virtualenv they share sits beside them, as venv/. Every path is
 # quoted, and escaped before it reaches sed: a directory with a space, an &
 # or a | in its name is a directory like any other.
@@ -84,8 +85,23 @@ TOOLSMAN1=$DESTDIR$PREFIX/share/man/man1
 DIST=$EXTROOT/xymon-plugins-dist
 
 # field PLUGIN KEY -- the value of KEY in the plugin's PLUGIN file, one line
-# for each time the key appears.
-field() { sed -n "s/^$2: //p" "$ROOT/plugins/$1/PLUGIN"; }
+# for each time the key appears; nothing for a plugin gone from the checkout.
+field() { [ ! -f "$ROOT/plugins/$1/PLUGIN" ] || sed -n "s/^$2: //p" "$ROOT/plugins/$1/PLUGIN"; }
+
+# held ROOT PLUGIN KEY -- the value of KEY in the PLUGIN file installed with
+# the plugin under ROOT ($EXTROOT or $TOOLSROOT): the record of what that
+# install put in place, which uninstall, enable, disable and an update act
+# on, rather than on what this checkout would install. An install from
+# before the record has none: the checkout's is read, as it was. The record
+# lies in a directory the Xymon user can write, so a name read from it is
+# used only once plain says it names no other directory.
+held() {
+	if [ -f "$1/$2/PLUGIN" ] && [ ! -L "$1/$2/PLUGIN" ]; then
+		sed -n "s/^$3: //p" "$1/$2/PLUGIN"
+	elif [ -f "$ROOT/plugins/$2/PLUGIN" ]; then
+		field "$2" "$3"
+	fi
+}
 
 # sedesc TEXT -- TEXT escaped for the right-hand side of a sed s|||.
 sedesc() { printf '%s\n' "$1" | sed -e 's/[\\&|]/\\&/g'; }
@@ -106,16 +122,22 @@ all_plugins() {
 # known PLUGIN -- refuse a name that is not a plugin here, or that could
 # name a directory other than one plugin's.
 known() {
-	case $1 in ""|*/*|.|..) die "not a plugin name: '$1'" ;; esac
-	[ -f "$ROOT/plugins/$1/PLUGIN" ] || die "no plugin $1 here: the plugins are $(echo $(all_plugins))"
+	plain "$1" || die "not a plugin name: '$1'"
+	[ -f "$ROOT/plugins/$1/PLUGIN" ] || [ -f "$EXTROOT/$1/PLUGIN" ] || [ -f "$TOOLSROOT/$1/PLUGIN" ] \
+		|| die "no plugin $1 here: the plugins are $(echo $(all_plugins))"
 }
 
-# depth PLUGIN -- how many plugins deep it stands on: 0 for one that needs
-# none. Uninstalling every plugin goes from the deepest up.
+# depth PLUGIN [ROOT] -- how many plugins deep it stands on: 0 for one that
+# needs none; by the records of the plugins installed under ROOT when
+# given, as an uninstall goes from the deepest up among what is installed.
 depth() {
+	# Always run in $(...): globbing off for this subshell only.
+	set -f
 	d=0
-	for n in $(field "$1" needs); do
-		x=$(depth "$n"); [ $((x + 1)) -gt $d ] && d=$((x + 1))
+	if [ -n "${2:-}" ]; then needs=$(held "$2" "$1" needs); else needs=$(field "$1" needs); fi
+	for n in $needs; do
+		plain "$n" || continue
+		x=$(depth "$n" "${2:-}"); [ $((x + 1)) -gt $d ] && d=$((x + 1))
 	done
 	echo $d
 }
@@ -236,7 +258,8 @@ $found}"
 
 # fresh DIR -- DIR, emptied: an install replaces a plugin's directory as a
 # whole, so that a file a newer version no longer ships does not stay behind
-# to be imported. It holds only what the plugin ships and its VERSION.
+# to be imported. It holds only what the plugin ships, its VERSION and its
+# PLUGIN file.
 fresh() { rm -rf "$1" && mkdir -p "$1"; }
 
 # copy PLUGIN SIDE DIR -- the side's files into DIR, executable or not.
@@ -261,10 +284,18 @@ version() {
 	printf '%s\n' "$v" > "$2/VERSION" && chmod 644 "$2/VERSION"
 }
 
-# manual PLUGIN PAGE MANROOT -- the page into its section's directory.
+# manual PLUGIN PAGE DIR MANROOT FINAL -- the page kept in the plugin's
+# directory DIR, and linked from its section's directory under MANROOT; the
+# link names FINAL, that directory as installed, without DESTDIR. Removing
+# the directory leaves a link that points nowhere, and a removal knows the
+# page is the plugin's by the link, not by what its record says.
 manual() {
 	[ -n "$2" ] || return 0
-	mkdir -p "$3/man${2##*.}" && cp -f "$ROOT/plugins/$1/$2" "$3/man${2##*.}/" && chmod 644 "$3/man${2##*.}/$2"
+	plain "$2" || die "$1's PLUGIN file names '$2' as its manual page, which is no file of its own directory"
+	[ ! -L "$ROOT/plugins/$1/$2" ] || die "$1's $2 is a link, which is not installed"
+	cp -f "$ROOT/plugins/$1/$2" "$3/$2" && chmod 644 "$3/$2" || exit 1
+	mkdir -p "$4/man${2##*.}" || exit 1
+	rm -f "$4/man${2##*.}/$2" && ln -s "$5/$2" "$4/man${2##*.}/$2" || exit 1
 }
 
 # declared PLUGINFILE -- the names a PLUGIN file gives to stage, one per
@@ -280,9 +311,10 @@ declared() {
 }
 
 # plain NAME -- true when NAME is a file name of a plugin's own directory:
-# not empty, ., .., nor holding a /.
+# letters, digits, ., _, + and - only, and not . or ..: no /, and nothing a
+# shell would expand or split.
 plain() {
-	case $1 in ""|.|..|*/*) return 1 ;; esac
+	case $1 in ""|.|..|*[!A-Za-z0-9._+-]*) return 1 ;; esac
 	return 0
 }
 
@@ -421,7 +453,7 @@ task() {
 
 # enable PLUGIN, disable PLUGIN -- its task on or off, by its link.
 enable() {
-	[ -n "$(field "$1" task)" ] || die "$1 has no task to enable"
+	[ -n "$(held "$EXTROOT" "$1" task)" ] || die "$1 has no task to enable"
 	[ -f "$EXTROOT/$1/tasks.cfg" ] || die "$1 is not installed in $EXTROOT"
 	ours "$1"
 	[ -L "$TASKDIR/$1" ] && { echo "$1 is on already"; return 0; }
@@ -430,7 +462,7 @@ enable() {
 	echo "$1 is on: xymonlaunch starts it within half a minute"
 }
 disable() {
-	[ -n "$(field "$1" task)" ] || die "$1 has no task to disable"
+	[ -n "$(held "$EXTROOT" "$1" task)" ] || die "$1 has no task to disable"
 	ours "$1"
 	[ -L "$TASKDIR/$1" ] || { echo "$1 is off already"; return 0; }
 	rm -f "$TASKDIR/$1"
@@ -440,10 +472,12 @@ disable() {
 # status SIDE ROOT PLUGIN -- one line for the plugin on that side: the
 # version installed, from its VERSION -- a release tag, NAME/vX.Y.Z, read as
 # its X.Y.Z -- or that it is not; on the server, whether its task is on; and
-# the version in this checkout, with "newer" when it is. A plugin that has
-# nothing on that side says nothing.
+# the version in this checkout, with "newer" when it is, or that the
+# checkout has it no more. The side and the task are read from the
+# installed copy of its PLUGIN file. A plugin that has nothing on that
+# side says nothing.
 status() {
-	[ -n "$(field "$3" "$1-files")" ] || return 0
+	[ -n "$(held "$2" "$3" "$1-files")" ] || return 0
 	here=$(field "$3" version)
 	if [ ! -f "$2/$3/VERSION" ]; then
 		echo "$3: not installed; this checkout has $here"
@@ -451,8 +485,12 @@ status() {
 	fi
 	v=$(sed -e 's|^.*/v||' "$2/$3/VERSION")
 	state=
-	if [ "$1" = server ] && [ -n "$(field "$3" task)" ]; then
+	if [ "$1" = server ] && [ -n "$(held "$2" "$3" task)" ]; then
 		if [ -L "$TASKDIR/$3" ]; then state=", on"; else state=", off"; fi
+	fi
+	if [ -z "$here" ]; then
+		echo "$3: $v installed$state; not in this checkout"
+		return 0
 	fi
 	newer=
 	older "$v" "$here" && newer=", newer"
@@ -462,7 +500,7 @@ status() {
 # installed_tasks -- the plugins named, or every one installed with a task.
 installed_tasks() {
 	for n in $LIST; do
-		if [ -n "$NAMES" ] || { [ -n "$(field "$n" task)" ] && [ -d "$EXTROOT/$n" ]; }; then echo "$n"; fi
+		if [ -n "$NAMES" ] || { [ -n "$(held "$EXTROOT" "$n" task)" ] && [ -d "$EXTROOT/$n" ]; }; then echo "$n"; fi
 	done
 }
 
@@ -590,6 +628,10 @@ install_server() {
 	for n in $(field "$1" needs); do known "$n"; install_server "$n"; done
 	[ -n "$(field "$1" server-files)" ] || die "$1 has nothing to install on the server"
 	ext=$EXTROOT/$1
+	# What the install in place put outside its directory, by its record,
+	# for what this one no longer does.
+	was_manual=$(held "$EXTROOT" "$1" server-manual)
+	was_task=$(held "$EXTROOT" "$1" task)
 	# Refused before anything is replaced, not halfway through.
 	[ -z "$(field "$1" task)" ] || ours "$1"
 	# The task file an admin may have enabled, and the web server snippets
@@ -601,8 +643,11 @@ install_server() {
 	fresh "$ext" || exit 1
 	copy "$1" server "$ext"
 	version "$1" "$ext"
+	record "$1" "$ext"
 	dist "$1"
-	manual "$1" "$(field "$1" server-manual)" "$DESTDIR$MANDIR"
+	[ "$was_manual" = "$(field "$1" server-manual)" ] || drop_manual "$was_manual" "$DESTDIR$MANDIR" "$XYMONHOME/ext/$1" ""
+	manual "$1" "$(field "$1" server-manual)" "$ext" "$DESTDIR$MANDIR" "$XYMONHOME/ext/$1"
+	[ -z "$was_task" ] || [ -n "$(field "$1" task)" ] || drop_task "$1"
 	task "$1"
 	conf "$1"
 	say "$1" installed
@@ -616,18 +661,25 @@ install_tools() {
 	for n in $(field "$1" needs); do known "$n"; install_tools "$n"; done
 	[ -n "$(field "$1" tools-files)" ] || die "$1 has nothing to install on your own machine"
 	dir=$TOOLSROOT/$1
+	was_manual=$(held "$TOOLSROOT" "$1" tools-manual)
+	was_command=$(held "$TOOLSROOT" "$1" command)
 	fresh "$dir" || exit 1
 	mkdir -p "$BIN" "$TOOLSMAN1"
 	copy "$1" tools "$dir"
 	version "$1" "$dir"
+	record "$1" "$dir"
+	set -f
+	# shellcheck disable=SC2086
+	[ "$was_command" = "$(field "$1" command)" ] || drop_command "$1" $was_command
+	set +f
+	[ "$was_manual" = "$(field "$1" tools-manual)" ] \
+		|| drop_manual "$was_manual" "$DESTDIR$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1" ""
 	set -- "$1" $(field "$1" command)
 	if [ $# -eq 3 ]; then
-		# The command runs the script from where it is installed: PREFIX as
-		# given, without DESTDIR, quoted.
-		printf '#!/bin/sh\nexec "%s/libexec/xymon-plugins/%s/%s" "$@"\n' "$PREFIX" "$1" "$3" > "$BIN/$2"
+		wrapper "$1" "$3" > "$BIN/$2"
 		chmod 755 "$BIN/$2"
 	fi
-	manual "$1" "$(field "$1" tools-manual)" "$DESTDIR$PREFIX/share/man"
+	manual "$1" "$(field "$1" tools-manual)" "$dir" "$DESTDIR$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1"
 	venv_auto "$1" "$TOOLSROOT" "$(field "$1" tools-modules)" venv-tools "$(field "$1" venv-note)"
 	DONE="$DONE $1"
 }
@@ -635,30 +687,101 @@ install_tools() {
 # needed PLUGIN DIR -- refuse to remove the plugin while one installed in DIR
 # needs it beside it: removing it would leave that one broken.
 needed() {
-	for d in $(dependents "$1"); do
-		[ -e "$2/$d" ] && die "$1 is needed by $d, installed in $2: uninstall $d first"
+	for p in "$2"/*; do
+		[ -d "$p" ] || continue
+		case " $(held "$2" "${p##*/}" needs) " in
+			*" $1 "*) die "$1 is needed by ${p##*/}, installed in $2: uninstall ${p##*/} first" ;;
+		esac
 	done
 	return 0
+}
+
+# record PLUGIN DIR -- keep the plugin's PLUGIN file in DIR, its installed
+# directory, as the record held reads.
+record() {
+	cp -f "$ROOT/plugins/$1/PLUGIN" "$2/PLUGIN" && chmod 644 "$2/PLUGIN" || exit 1
+}
+
+# drop_manual NAME MANROOT FINAL LEGACY -- remove the manual page NAME from
+# its section under MANROOT when it is the link an install made into FINAL,
+# the plugin's directory as installed; or, for an install from before the
+# record, LEGACY set, the page copied there, its name the checkout's.
+drop_manual() {
+	[ -n "$1" ] && plain "$1" || return 0
+	m=$2/man${1##*.}/$1
+	if [ -L "$m" ]; then
+		[ "$(readlink "$m")" = "$3/$1" ] && rm -f "$m"
+	elif [ -n "$4" ]; then
+		rm -f "$m"
+	fi
+	return 0
+}
+
+# wrapper PLUGIN SCRIPT -- the command an install writes in $BIN: it runs
+# the script from where it is installed, PREFIX as given, without DESTDIR.
+wrapper() {
+	printf '#!/bin/sh\nexec "%s/libexec/xymon-plugins/%s/%s" "$@"\n' "$PREFIX" "$1" "$2"
+}
+
+# drop_command PLUGIN NAME SCRIPT -- remove $BIN/NAME when it is, byte for
+# byte, the command an install of PLUGIN wrote for SCRIPT, and not a
+# command of someone else's, a wrapper of their own among them.
+drop_command() {
+	[ -n "$2" ] && plain "$2" && plain "$3" && [ -f "$BIN/$2" ] && [ ! -L "$BIN/$2" ] || return 0
+	# The x keeps the trailing newlines a command substitution drops.
+	[ "$(cat "$BIN/$2"; echo x)" = "$(wrapper "$1" "$3"; echo x)" ] && rm -f "$BIN/$2"
+	return 0
+}
+
+# drop_task PLUGIN -- remove tasks.d/PLUGIN: the link to the plugin's task
+# file, or the file there, a copy an older install made or the task an
+# editor left in the link's place; never a link to something else. And the
+# task file an install set aside.
+drop_task() {
+	if [ -L "$TASKDIR/$1" ]; then
+		[ "$(readlink "$TASKDIR/$1")" = "$XYMONHOME/ext/$1/tasks.cfg" ] && rm -f "$TASKDIR/$1"
+	else
+		rm -f "$TASKDIR/$1"
+	fi
+	rm -f "$EXTROOT/.$1.tasks.cfg"
+}
+
+# with_installed ROOT -- LIST, and the plugins installed under ROOT with a
+# record the checkout no longer has, for an action given no names.
+with_installed() {
+	echo $LIST
+	for d in "$1"/*; do
+		[ -f "$d/PLUGIN" ] && [ ! -L "$d/PLUGIN" ] || continue
+		n=${d##*/}
+		plain "$n" || continue
+		case " $(echo $LIST) " in *" $n "*) ;; *) echo "$n" ;; esac
+	done
 }
 
 uninstall_server() {
 	needed "$1" "$EXTROOT"
 	needed "$1" "$DIST/plugins"
+	m=$(held "$EXTROOT" "$1" server-manual)
+	t=$(held "$EXTROOT" "$1" task)
+	legacy=; [ -f "$EXTROOT/$1/PLUGIN" ] || legacy=1
 	rm -rf "$EXTROOT/$1" "$DIST/plugins/$1"
-	m=$(field "$1" server-manual)
-	[ -n "$m" ] && rm -f "$DESTDIR$MANDIR/man${m##*.}/$m"
-	[ -n "$(field "$1" task)" ] && rm -f "$TASKDIR/$1"
-	say "$1" uninstalled
+	drop_manual "$m" "$DESTDIR$MANDIR" "$XYMONHOME/ext/$1" "$legacy"
+	[ -z "$t" ] || drop_task "$1"
+	if [ -f "$ROOT/plugins/$1/PLUGIN" ]; then say "$1" uninstalled; else echo "Uninstalled $1."; fi
 }
 
 uninstall_tools() {
 	needed "$1" "$TOOLSROOT"
+	c=$(held "$TOOLSROOT" "$1" command)
+	m=$(held "$TOOLSROOT" "$1" tools-manual)
+	legacy=; [ -f "$TOOLSROOT/$1/PLUGIN" ] || legacy=1
 	rm -rf "$TOOLSROOT/$1"
-	set -- "$1" $(field "$1" command)
-	[ $# -eq 3 ] && rm -f "$BIN/$2"
-	m=$(field "$1" tools-manual)
-	[ -n "$m" ] && rm -f "$TOOLSMAN1/$m"
-	say "$1" uninstalled-tools
+	set -f
+	# shellcheck disable=SC2086
+	drop_command "$1" $c
+	set +f
+	drop_manual "$m" "$DESTDIR$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1" "$legacy"
+	if [ -f "$ROOT/plugins/$1/PLUGIN" ]; then say "$1" uninstalled-tools; else echo "Uninstalled $1."; fi
 }
 
 case $ACTION in
@@ -675,7 +798,7 @@ esac
 for n in $NAMES; do known "$n"; done
 if [ -n "$NAMES" ]; then LIST=$NAMES; else LIST=$(all_plugins); fi
 deepest_first() {
-	for n in $LIST; do echo "$(depth "$n") $n"; done | sort -rn | cut -d' ' -f2
+	for n in $LIST; do echo "$(depth "$n" "$1") $n"; done | sort -rn | cut -d' ' -f2
 }
 
 case $ACTION in
@@ -688,21 +811,27 @@ case $ACTION in
 		for n in $LIST; do install_tools "$n"; done ;;
 	enable-server)
 		need_home
+		[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
 		for n in $(installed_tasks); do enable "$n"; done ;;
 	disable-server)
 		need_home
+		[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
 		for n in $(installed_tasks); do disable "$n"; done ;;
 	status-server)
 		need_home
+		[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
 		for n in $LIST; do status server "$EXTROOT" "$n"; done ;;
 	status-tools)
+		[ -n "$NAMES" ] || LIST=$(with_installed "$TOOLSROOT")
 		for n in $LIST; do status tools "$TOOLSROOT" "$n"; done ;;
 	uninstall-server)
 		need_home
-		for n in $(deepest_first); do uninstall_server "$n"; done
+		[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
+		for n in $(deepest_first "$EXTROOT"); do uninstall_server "$n"; done
 		[ -n "$NAMES" ] || rm -rf "$EXTROOT/venv" ;;
 	uninstall-tools)
-		for n in $(deepest_first); do uninstall_tools "$n"; done
+		[ -n "$NAMES" ] || LIST=$(with_installed "$TOOLSROOT")
+		for n in $(deepest_first "$TOOLSROOT"); do uninstall_tools "$n"; done
 		if [ -z "$NAMES" ]; then
 			rm -rf "$TOOLSROOT/venv"
 			rmdir "$TOOLSROOT" 2>/dev/null || true
