@@ -25,9 +25,11 @@ here=$(sed -n 's/^version: *//p' "$ROOT/plugins/xymonapi/PLUGIN")
 
 st() { "$ROOT/install.sh" status-server "$@" XYMONHOME="$home" 2>&1; }
 
-ls -laR "$home" > "$work/before"
+# Each entry under $home with its own details, and no ".." line: on some
+# systems (macOS) the file written here beside $home changes its parent's.
+find "$home" -exec ls -ld {} + | sort > "$work/before"
 assert_contains "xymonapi: not installed; this checkout has $here" "$(st)" "[S15] a plugin not installed is said to be"
-ls -laR "$home" > "$work/after"
+find "$home" -exec ls -ld {} + | sort > "$work/after"
 cmp -s "$work/before" "$work/after" || fail "[S15] status changed the tree: $(diff "$work/before" "$work/after")"
 
 "$ROOT/install.sh" install-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/install.log" 2>&1 \
