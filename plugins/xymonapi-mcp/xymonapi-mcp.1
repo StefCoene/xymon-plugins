@@ -90,7 +90,7 @@ server's for one in front of it -- without /xymon/api/v1, which is added; or
 unix:PATH, the API's own
 socket on the server, where no token is needed (xymonapi(8),
 XYMONAPI_SOCKET). The default is that socket when XYMONAPI_SOCKET, or
-XYMONVAR, says where it is and it is there, and http://127.0.0.1:1986
+XYMONRUNDIR (XYMONSERVERLOGS when it is empty), says where it is and it is there, and http://127.0.0.1:1986
 otherwise.
 .IP "\fBXYMONAPI_TOKEN_FILE\fR, \fBXYMONAPI_TOKEN\fR"
 A client token, from the first line of the file XYMONAPI_TOKEN_FILE names,

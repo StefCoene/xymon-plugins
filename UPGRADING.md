@@ -10,7 +10,10 @@ that breaks the API's contract without a line here.
 The web server's relay socket is now `$XYMONRUNDIR/xymonapi/relay.sock`,
 in the directory Xymon keeps for its sockets, or in its log directory,
 `$XYMONSERVERLOGS`, when `XYMONRUNDIR` is empty, as Xymon does. It was
-`$XYMONHOME/tmp/xymonapi-relay/relay.sock`. The install reads the directory
+`$XYMONHOME/tmp/xymonapi-relay/relay.sock`. The socket for the server's
+own programs is beside it, `$XYMONRUNDIR/xymonapi/local/api.sock`; it was
+`$XYMONVAR/xymonapi/api.sock`, and the clients look only at the new path.
+The install reads the directory
 from `$XYMONHOME/etc/xymonserver.cfg` and replaces a 4.0.0 snippet it finds
 unedited. What breaks: a snippet you edited is kept, and the install says
 it differs: put the new socket path in it. Where `XYMONRUNDIR` names a

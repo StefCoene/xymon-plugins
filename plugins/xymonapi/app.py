@@ -345,7 +345,7 @@ _ask_times: dict[str, collections.deque] = collections.defaultdict(collections.d
 def _ask_agent(question: str, agent: str, session: str) -> dict:
     """Run xymonapi-agent for one question, as this process's user, with
     this environment: on the server, the client finds the API's own socket
-    from it (XYMONAPI_SOCKET, XYMONVAR), so nothing crosses the network.
+    from it (XYMONAPI_SOCKET, XYMONRUNDIR), so nothing crosses the network.
     The agent's JSON, or RuntimeError with the agent's last line."""
     argv = [str(AGENT), "--agent", agent, "ask", "--json", question]
     if session:
@@ -654,14 +654,23 @@ def main(argv: list[str]) -> int:
             bound.append(at)
             servers.append((Server(uvicorn.Config(app, access_log=False, proxy_headers=False)), relay))
             log.info("listening on the relay socket %s too, a password asked there", at)
+    made = []
     if args.socket:
         # Mode 660 in a directory of 750: the Xymon user and its group reach
         # it, and nobody else (xymonapi(8), XYMONAPI_SOCKET). A file left by
         # an earlier run is replaced; another live server there is not
         # checked for, as the port's "address in use" is: the task runs one.
-        d = os.path.dirname(args.socket)
-        if d:
-            os.makedirs(d, mode=0o750, exist_ok=True)
+        # The directories it makes on the way, it takes away when it stops.
+        d = os.path.dirname(os.path.abspath(args.socket))
+        missing = []
+        while not os.path.isdir(d):
+            missing.append(d)
+            d = os.path.dirname(d)
+        for d in reversed(missing):
+            os.mkdir(d, 0o755)
+            made.append(d)
+        if made:
+            os.chmod(made[-1], 0o750)
         with contextlib.suppress(FileNotFoundError):
             if stat.S_ISSOCK(os.lstat(args.socket).st_mode):
                 os.unlink(args.socket)
@@ -687,8 +696,11 @@ def main(argv: list[str]) -> int:
         for path in ([args.socket] if args.socket else []) + bound:
             with contextlib.suppress(OSError):
                 os.unlink(path)
-        # And the relay's directory, the API's own, once empty: removing the
-        # plugin leaves nothing behind it in Xymon's runtime directory.
+        # And the directories it made, the API's own, once empty: removing
+        # the plugin leaves nothing behind it in Xymon's runtime directory.
+        for d in reversed(made):
+            with contextlib.suppress(OSError):
+                os.rmdir(d)
         for path in bound:
             with contextlib.suppress(OSError):
                 os.rmdir(os.path.dirname(path))

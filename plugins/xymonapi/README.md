@@ -103,11 +103,11 @@ Then turn it on, `XYMONHOME=/usr/lib/xymon/server ./install.sh enable-server xym
 
 ```sh
 curl http://127.0.0.1:1986/xymon/api/v1/health              # the port: 401 means it runs and asks for a user
-curl --unix-socket "$XYMONVAR/xymonapi/api.sock" http://localhost/xymon/api/v1/health
+curl --unix-socket "$XYMONRUNDIR/xymonapi/local/api.sock" http://localhost/xymon/api/v1/health
 ```
 
 The port asks for one of its [users](#users), `-u alice`, whatever the
-address. The socket, `$XYMONVAR/xymonapi/api.sock`, is for the programs of
+address. The socket, `$XYMONRUNDIR/xymonapi/local/api.sock`, is for the programs of
 the server itself and asks none: its permissions let the Xymon user and its
 group in, and nobody else. The plugins' commands take it by default
 there (`xymonapi.8`, `XYMONAPI_SOCKET`).

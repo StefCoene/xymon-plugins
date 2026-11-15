@@ -56,9 +56,14 @@ listen=${XYMONAPI_LISTEN:-127.0.0.1:1986}
 port=${listen##*:}
 host=`echo "${listen%:*}" | sed -e 's/^\[//' -e 's/\]$//'`
 
+# Xymon's runtime directory, where the API's sockets go: XYMONRUNDIR, or
+# XYMONSERVERLOGS when it is empty, as Xymon does.
+run=${XYMONRUNDIR:-${XYMONSERVERLOGS:-}}
+
 # The Unix socket for this machine's own clients, which need no password
-# there: XYMONAPI_SOCKET, or $XYMONVAR/xymonapi/api.sock; set empty, none.
-sock=${XYMONAPI_SOCKET-${XYMONVAR:+$XYMONVAR/xymonapi/api.sock}}
+# there: XYMONAPI_SOCKET, or local/api.sock in the API's directory there,
+# local/ being the Xymon user's and its group's alone; set empty, none.
+sock=${XYMONAPI_SOCKET-${run:+$run/xymonapi/local/api.sock}}
 
 # TLS, with xymond's own certificate and key (xymon-tls(7)) unless others
 # are named: when both files are there the API speaks HTTPS, when neither is
@@ -80,11 +85,9 @@ fi
 
 # The Unix socket the web server relays to, whatever the port speaks, so
 # that its snippets need not follow the certificates; a password is asked
-# there as on the port. XYMONAPI_RELAY_SOCKET, by default in Xymon's
-# runtime directory -- XYMONRUNDIR, or XYMONSERVERLOGS when it is empty, as
-# Xymon does -- where the snippets, written at install, look for it; set
-# empty, none.
-run=${XYMONRUNDIR:-${XYMONSERVERLOGS:-}}
+# there as on the port. XYMONAPI_RELAY_SOCKET, by default in the API's
+# directory in Xymon's runtime directory, where the snippets, written at
+# install, look for it; set empty, none.
 relay=${XYMONAPI_RELAY_SOCKET-${run:+$run/xymonapi/relay.sock}}
 
 cd "$here" || exit 1

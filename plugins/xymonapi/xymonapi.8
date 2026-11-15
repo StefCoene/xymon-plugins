@@ -38,7 +38,7 @@ $XYMONRUNDIR/xymonapi/relay.sock by default, is the same in plain
 HTTP, for the web server and an SSH tunnel, whether the port speaks HTTPS
 or not: a password or token is needed there too (XYMONAPI_RELAY_SOCKET
 under ENVIRONMENT). The other Unix socket,
-$XYMONVAR/xymonapi/api.sock by default, is for the programs of the server
+$XYMONRUNDIR/xymonapi/local/api.sock by default, is for the programs of the server
 itself: none is needed there, because only the Xymon user and its group
 may open it (XYMONAPI_SOCKET under ENVIRONMENT).
 
@@ -266,8 +266,10 @@ Groups trusted with the relay socket's path, names or numbers: a directory
 on it that such a group may write is taken as safe (XYMONAPI_RELAY_SOCKET).
 None by default.
 .IP "\fBXYMONAPI_SOCKET\fR"
-The Unix socket for the programs of this machine: $XYMONVAR/xymonapi/api.sock
-by default, none when set to the empty string. A request through it needs
+The Unix socket for the programs of this machine:
+$XYMONRUNDIR/xymonapi/local/api.sock by default, in Xymon's runtime
+directory beside the relay socket ($XYMONSERVERLOGS when XYMONRUNDIR is
+empty), none when set to the empty string. A request through it needs
 no password and no token. The API makes it mode 660 in a directory of mode
 750, so that only the Xymon user and the members of its group can open it,
 and that is the whole check: the kernel's, which no header or address
@@ -276,7 +278,7 @@ client as that user. The port is as it was: a request there, through the
 web server or not, needs the password or a token. The socket speaks plain
 HTTP whether or not the port speaks TLS, since nothing of it leaves the
 machine. The clients take it as \fBXYMONAPI_URL=unix:\fRPATH, and by
-default when XYMONVAR from xymonserver.cfg leads them to it, as the tasks
+default when XYMONRUNDIR from xymonserver.cfg leads them to it, as the tasks
 have it: xymonapi-mcp(1), xymonapi-rag(1).
 .IP "\fBXYMONAPI_PASSWD\fR"
 An htpasswd file: every request on the port but /plugins needs a user and
@@ -359,8 +361,10 @@ A file of yours here holds the settings of its own listed under
 ENVIRONMENT. Nothing is installed there.
 .IP "\fB$XYMONVAR/xymonapi/tokens\fR"
 The client tokens' SHA-256s, one JSON line each (TOKENS above).
-.IP "\fB$XYMONVAR/xymonapi/api.sock\fR"
-The Unix socket (XYMONAPI_SOCKET above), while the API runs.
+.IP "\fB$XYMONRUNDIR/xymonapi/\fR"
+The API's directory in Xymon's runtime directory, while it runs: the relay
+socket, relay.sock, and local/api.sock (XYMONAPI_RELAY_SOCKET and
+XYMONAPI_SOCKET above). Made when the API starts, taken away when it stops.
 .IP "\fB$XYMONSERVERLOGS/xymonapi.log\fR"
 The log, written through the task's LOGFILE. A missing Python or module is
 reported here, and so is each token made, revoked, or used: user@machine.
