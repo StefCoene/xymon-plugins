@@ -193,7 +193,12 @@ adds:
   group. On Homebrew, `/opt/homebrew`'s directories (`opt`, `Cellar`, `var`)
   are writable by the `admin` group, by design:
   `XYMONAPI_RELAY_TRUSTED_GROUPS=admin` in `xymonserver.d/` trusts it, if
-  every admin may see the API's passwords.
+  every admin may see the API's passwords. On Ubuntu, `/var/log` is
+  writable by the `syslog` group, and Xymon's runtime directory defaults
+  to the log directory: rather than trust `syslog`, set
+  `XYMONRUNDIR="/var/lib/xymon/run"` in `xymonserver.d/` (the directory
+  owned by the Xymon user, mode 755), restart Xymon and install the plugin
+  again (`xymonapi.8`, `XYMONAPI_RELAY_SOCKET`).
 - **An SSH tunnel**, for one person:
   `ssh -L 1986:/run/xymon/xymonapi/relay.sock xymon-server`, to the relay
   socket in the server's `$XYMONRUNDIR`, here `/run/xymon`. The URL:
