@@ -155,7 +155,7 @@ or a time it cannot read, is answered with 400. A test name may hold a
 colon, as an HTTP test's RRD file does (tcp.http.www.example.com:8080,);
 a host name may not.
 
-.IP "\fBPOST /ask\fR {"question": Q, "session": NAME, "agent": NAME}"
+.IP "\fBPOST /ask\fR {\(dqquestion\(dq: Q, \(dqsession\(dq: NAME, \(dqagent\(dq: NAME}"
 A question in words, answered in words by
 .I xymonapi-agent(1)
 installed beside the API: it runs an agent CLI the admin installed as the
@@ -188,7 +188,7 @@ instead of the password: Authorization: Bearer TOKEN.
 xymonapi-connect(1) gets one, naming the machine by its short hostname, so
 the password stays off the laptop. A token opens every path but /tokens, which
 takes the password: a stolen token cannot make others, or renew itself.
-.IP "\fBPOST /tokens\fR {"client": NAME}"
+.IP "\fBPOST /tokens\fR {\(dqclient\(dq: NAME}"
 A new token for the caller on NAME -- letters, digits, . _ or -, 64 at most
 -- replacing any the caller had there, which is refused from then on. It is
 shown this once: only its SHA-256 is kept, in $XYMONAPI_TOKENS.

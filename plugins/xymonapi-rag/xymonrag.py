@@ -122,7 +122,7 @@ def manpage_passages(path: Path) -> list[dict]:
     if path.suffix == ".gz":
         raw = gzip.decompress(raw)
     text = raw.decode("utf-8", errors="replace")
-    th = next((l for l in text.splitlines() if l.startswith(".TH")), "")
+    th = next((ln for ln in text.splitlines() if ln.startswith(".TH")), "")
     if "xymon" not in th.lower():
         return []
     page = path.name.removesuffix(".gz")
@@ -140,11 +140,14 @@ def manpage_passages(path: Path) -> list[dict]:
     tp = False
     for line in text.splitlines():
         if line.startswith((".SH", ".SS")):
-            flush(); section, item = _plain(line[3:]), ""
+            flush()
+            section, item = _plain(line[3:]), ""
         elif line.startswith(".IP"):
-            flush(); item = _plain(line[3:])
+            flush()
+            item = _plain(line[3:])
         elif line.startswith(".TP"):
-            flush(); tp = True
+            flush()
+            tp = True
         elif line.startswith(("." , "'")):
             m = re.match(r"\.(?:B|I|BR|BI|IB|IR|RB|RI)\s+(.*)", line)
             if m and tp:                 # .TP then .B NAME: the name is the item
