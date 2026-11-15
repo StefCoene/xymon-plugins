@@ -280,6 +280,18 @@ assert_not_contains 'web.example.com' "$(XYMONAPI_RAG_INDEX="$work/index4.npz" r
 # Names a digit apart embed much the same, so any of the newest fifty will do.
 assert_match 'many1(0[5-9][0-9]|100)\.example\.com conn' "$(XYMONAPI_RAG_INDEX="$work/index4.npz" rag search -k 1 --kind history 'many1100.example.com conn red')" "and the newest kept"
 
+# XYMONAPI_HIDE set after the history was indexed: every saved status is
+# read again, so what it hides leaves the index, and that passage alone is
+# embedded again.
+echo 'Internal Server Error' > "$work/hide-late"
+cp "$work/index.npz" "$work/index7.npz"
+XYMONAPI_HIDE="$work/hide-late" XYMONAPI_RAG_INDEX="$work/index7.npz" rag index > "$work/index7.out" \
+	|| fail "indexing with XYMONAPI_HIDE added failed: $(tail -n 5 "$work/rag.err")"
+assert_contains '(1 new)' "$(cat "$work/index7.out")" "only the change whose text it hides is embedded again"
+hist=$(XYMONAPI_RAG_INDEX="$work/index7.npz" rag search -k 1 --kind history 'HTTP 500 error on the login page')
+assert_contains '[hidden]' "$hist" "XYMONAPI_HIDE added later applies to a change indexed before it"
+assert_not_contains 'Internal Server Error' "$hist" "so the text it hides leaves the index"
+
 # A saved status that fails to be read for another reason than a missing
 # file -- here no XYMONHISTLOGS, which the API answers with 502 -- must fail
 # the indexing, not build an index without the texts: from the files, and
