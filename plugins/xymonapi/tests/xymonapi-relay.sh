@@ -16,6 +16,7 @@
 # XYMONAPI_RELAY_TRUSTED_GROUPS: where that does not hold -- a directory
 # others write, another's socket listening there, a directory above others
 # write, the directory a link, a file at the path, a group not trusted --
+# a link leading nowhere --
 # there is no relay, the API runs on with its port and other socket, says
 # why in its log, and /health says "relay": "refused"; it removes nothing
 # it did not make. /health says "listening" or "disabled" otherwise. No
@@ -122,6 +123,11 @@ mkdir -p "$work/real"; ln -s "$work/real" "$work/linked"
 refused "the directory a link" "that no one else writes" "$work/linked/relay.sock"
 mkdir -p "$work/file"; : > "$work/file/relay.sock"
 refused "a file at the socket's path" "not a socket" "$work/file/relay.sock"
+
+# A link on the way that leads nowhere: refused, the API running on, not
+# stopped by the error.
+ln -s "$work/nowhere" "$work/dangling"
+refused "a link on the way that leads nowhere" "nowhere" "$work/dangling/relay/relay.sock"
 
 # A directory its group may write: refused unless that group is trusted.
 mkdir -p "$work/grp"; chmod 775 "$work/grp"

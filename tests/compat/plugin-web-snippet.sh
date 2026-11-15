@@ -130,6 +130,14 @@ XYMONSERVERLOGS="/var/log/xymon"    # Logs')" "[S22] with XYMONRUNDIR empty, the
 assert_contains "/run/xymon/xymonapi/relay.sock" "$(cfgcase plain 'XYMONRUNDIR=/run/xymon')" "[S22] an unquoted XYMONRUNDIR is read"
 assert_contains "@XYMONRUNDIR@/xymonapi/relay.sock" "$(cfgcase var 'XYMONRUNDIR="$XYMONVAR/run"')" "[S22] one that names a variable is left as @XYMONRUNDIR@"
 assert_contains "put Xymon's runtime directory in its place" "$(cat "$work/var.log")" "[S22] and the install says so"
+# Set again in xymonserver.d/, which Xymon reads after xymonserver.cfg: that
+# value wins; an editor's backup there is left out, as Xymon leaves it.
+h=$work/dropin; server_tree "$h"
+mkdir -p "$h/etc/xymonserver.d"
+echo 'XYMONRUNDIR="/run/xymon"' > "$h/etc/xymonserver.d/local.cfg"
+echo 'XYMONRUNDIR="/backup/run"' > "$h/etc/xymonserver.d/local.cfg~"
+"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/mandropin" >"$work/dropin.log" 2>&1 || fail "install-server (dropin) failed"
+assert_contains "/run/xymon/xymonapi/relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-nginx.conf")" "[S22] XYMONRUNDIR set in xymonserver.d/ wins over xymonserver.cfg's"
 
 # xymonapi 4.0.0's snippets, with the relay under $XYMONHOME/tmp, are
 # recognised unedited, by this version's conf-stock lines, and replaced.
