@@ -681,6 +681,28 @@ conf() {
 	done
 }
 
+# selinux PLUGIN -- where SELinux is active, load the plugin's SELinux
+# module, PLUGIN.cil in its installed directory, which semodule takes as it
+# is; what it grants lies behind booleans, off until the admin sets them,
+# as its message says (S23). Named after the plugin, never otherwise, so
+# that an uninstall, which reads the installed PLUGIN copy, removes that
+# module and no other. Under DESTDIR nothing is loaded: it is the installed
+# system's.
+selinux() {
+	m=$(field "$1" selinux); [ -n "$m" ] || return 0
+	[ "$m" = "$1.cil" ] || die "$1: its SELinux module must be $1.cil, not $m"
+	if [ -n "$DESTDIR" ]; then
+		echo "Under DESTDIR no SELinux module is loaded: on the installed system, where SELinux is active, semodule -i $XYMONHOME/ext/$1/$m"
+		return 0
+	fi
+	command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled && command -v semodule >/dev/null 2>&1 || return 0
+	if semodule -i "$EXTROOT/$1/$m"; then
+		say "$1" selinux-loaded
+	else
+		echo "Could not load the SELinux module $EXTROOT/$1/$m: semodule -i it as root" >&2
+	fi
+}
+
 # restart PLUGIN -- a process that runs the plugin's program from this
 # install keeps the code it loaded: stop it, and xymonlaunch starts the new.
 # Found by its command line, which names the program by its full path,
@@ -807,6 +829,7 @@ install_server() {
 	# for what this one no longer does.
 	was_manual=$(held "$EXTROOT" "$1" server-manual)
 	was_task=$(held "$EXTROOT" "$1" task)
+	was_selinux=$(held "$EXTROOT" "$1" selinux)
 	# Refused before anything is replaced, not halfway through.
 	[ -z "$(field "$1" task)" ] || ours "$1"
 	# The task file an admin may have enabled, and the web server snippets
@@ -830,6 +853,11 @@ install_server() {
 	conf "$1"
 	say "$1" installed
 	restart "$1"
+	# A module the installed version loaded and this one has not goes.
+	if [ -n "$was_selinux" ] && [ -z "$(field "$1" selinux)" ] && [ -z "$DESTDIR" ] && command -v semodule >/dev/null 2>&1; then
+		semodule -r "$1" >/dev/null 2>&1 || :
+	fi
+	selinux "$1"
 	venv_auto "$1" "$EXTROOT" "$(field "$1" server-modules)" venv-server ""
 	DONE="$DONE $1"
 }
@@ -944,10 +972,15 @@ uninstall_server() {
 	needed "$1" "$DIST/plugins"
 	m=$(held "$EXTROOT" "$1" server-manual)
 	t=$(held "$EXTROOT" "$1" task)
+	se=$(held "$EXTROOT" "$1" selinux)
 	legacy=; [ -f "$EXTROOT/$1/PLUGIN" ] || legacy=1
 	rm -rf "$EXTROOT/$1" "$DIST/plugins/$1"
 	drop_manual "$m" "$MANDIR" "$XYMONHOME/ext/$1" "$legacy"
 	[ -z "$t" ] || drop_task "$1"
+	# Its SELinux module, the one named after it (S23).
+	if [ -n "$se" ] && [ -z "$DESTDIR" ] && command -v semodule >/dev/null 2>&1; then
+		semodule -r "$1" >/dev/null 2>&1 || :
+	fi
 	if [ -f "$ROOT/plugins/$1/PLUGIN" ]; then say "$1" uninstalled; else echo "Uninstalled $1."; fi
 }
 

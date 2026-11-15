@@ -2,7 +2,7 @@
 # it alone. One key per line, a key repeated for each line of a message;
 # ./install.sh at the repository's top installs it from the lines below.
 name: xymonapi
-version: 5.0.0
+version: 5.0.1
 side: server, client
 summary: a read-only HTTP and JSON interface to a Xymon server, as one of its xymonlaunch tasks, and its client
 requires: python >= 3.9
@@ -18,9 +18,11 @@ manual: xymonapi.8
 # restart are the server's xymonlaunch task, web server snippets kept once
 # written, and the program whose running process an install stops;
 # conf-stock a snippet as an earlier version shipped it, by its cksum, which
-# an install that finds it unedited replaces by this version's. The
-# messages may name @ETC@, @TASKDIR@ and @XYMONHOME@.
-server-files: app.py xymon.py xymonapi_client.py tokens.py openapi.yaml requirements.txt xymonapi.sh
+# an install that finds it unedited replaces by this version's; selinux the
+# plugin's SELinux module, NAME.cil among the server's files, loaded where
+# SELinux is active and removed with the plugin. The messages may name
+# @ETC@, @TASKDIR@ and @XYMONHOME@.
+server-files: app.py xymon.py xymonapi_client.py tokens.py openapi.yaml requirements.txt xymonapi.sh xymonapi.cil
 server-manual: xymonapi.8
 server-modules: fastapi uvicorn yaml
 task: xymonapi.tasks.DIST
@@ -35,10 +37,13 @@ conf-stock: xymonapi-apache.conf 2713648629 1136
 conf-stock: xymonapi-nginx.conf 3093070464 658
 conf-stock: xymonapi-lighttpd.conf 1394800773 787
 restart: app.py
+selinux: xymonapi.cil
 installed: Installed. For other machines, include @XYMONHOME@/ext/xymonapi/xymonapi-{apache,nginx,lighttpd}.conf in the web server,
 installed:   so that it is skipped once gone -- IncludeOptional on Apache, a wildcard (xymonapi-nginx*.conf) on nginx and lighttpd --
 installed:   or give the API xymond's certificate: see xymonapi(8).
 installed: It starts only with its users' passwords: @ETC@/xymonpasswd, the web pages' own, or another file in XYMONAPI_PASSWD.
+selinux-loaded: SELinux: the module xymonapi is loaded, its boolean off. For the web server to reach the API's relay socket:
+selinux-loaded:   setsebool -P xymonapi_relay on   -- see xymonapi(8), XYMONAPI_RELAY_SOCKET.
 uninstalled: Uninstalled xymonapi. Its web server snippets went with ext/xymonapi, which an IncludeOptional or a wildcard include skips.
 uninstalled:   Kept: the tokens file, $XYMONAPI_TOKENS ($XYMONVAR/xymonapi/tokens by default).
 tools-files: xymonapi_client.py xymonapi-connect.sh

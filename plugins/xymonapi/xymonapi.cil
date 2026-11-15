@@ -1,0 +1,18 @@
+; SPDX-License-Identifier: GPL-2.0-or-later
+;
+; xymonapi's SELinux module, in CIL, which semodule loads as it is: the
+; install loads it where SELinux is active, and removes it with the plugin.
+;
+; The web server's snippets pass /xymon/api/ to the API's relay socket,
+; $XYMONRUNDIR/xymonapi/relay.sock. The web server runs as httpd_t; the
+; API, a task of xymonlaunch, as unconfined_service_t, and the socket takes
+; its directory's label, httpd_sys_rw_content_t where Xymon's RPM labels
+; /run/xymon. Every Xymon daemon runs as unconfined_service_t, so the rule
+; cannot name the API alone: it lets httpd connect to the stream sockets
+; of every unconfined daemon. Hence the boolean, off: the admin who wants
+; the relay sets it, setsebool -P xymonapi_relay on (xymonapi(8)).
+(boolean xymonapi_relay false)
+(booleanif xymonapi_relay
+    (true
+        (allow httpd_t unconfined_service_t (unix_stream_socket (connectto)))
+        (allow httpd_t httpd_sys_rw_content_t (sock_file (write)))))

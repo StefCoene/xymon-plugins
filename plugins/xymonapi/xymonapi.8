@@ -268,8 +268,15 @@ $XYMONHOME/etc/xymonserver.d/ -- Xymon reads it at run time, so no
 rebuild -- then restart Xymon and install the plugin again, which writes
 the new path into the snippets; or /run/xymon, made again at each boot by
 a line "d /run/xymon 0755 xymon xymon -" in /etc/tmpfiles.d/xymon.conf,
-as Xymon's RPM does. No group is trusted for its name or number alone. Under SELinux the web server must be allowed to connect
-to the socket. Neither door reads
+as Xymon's RPM does. No group is trusted for its name or number alone.
+Under SELinux, the web server (httpd_t) may not connect to the API
+(unconfined_service_t): the install loads the module xymonapi.cil where
+SELinux is active, and the relay works once its boolean is set,
+setsebool -P xymonapi_relay on. As every Xymon daemon runs as
+unconfined_service_t, the rule lets the web server connect to any of
+their sockets, which is why it is off. The socket must take
+httpd_sys_rw_content_t from its directory, as /run/xymon has it with
+Xymon's RPM. Neither door reads
 X-Forwarded headers, and no path redirects to another: a trailing slash is
 not_found.
 .IP "\fBXYMONAPI_RELAY_TRUSTED_GROUPS\fR"
