@@ -5,8 +5,9 @@ index   reads the manual pages under XYMONAPI_RAG_DOCS and the colour
         changes with the status text saved at each -- from xymond's own
         files on the Xymon server, through the API anywhere else; cuts them
         into passages; and stores one vector per passage in XYMONAPI_RAG_INDEX.
-        A passage already in the index keeps its vector: only new ones are
-        embedded, and only new changes have their status text fetched.
+        A passage already in the index, with the same text, keeps its
+        vector: only new or changed ones are embedded. Every saved status
+        is read again, so what XYMONAPI_HIDE hides leaves the index.
 search  returns the passages nearest a question: from the index here, or,
         when there is none, from the API's /search, which reads the index
         on the Xymon server.
@@ -244,21 +245,17 @@ def _history_source():
     return _ApiHistory(client)
 
 
-def history_passages(since: str, known: dict | None = None) -> list[dict]:
+def history_passages(since: str) -> list[dict]:
     """One passage per colour change since SINCE, with the status text saved
-    at it, from xymond's files or through xymonapi(8) (_history_source). A
-    change in KNOWN -- the index as it was -- is taken from there, its text
-    not fetched again."""
+    at it, from xymond's files or through xymonapi(8) (_history_source).
+    Every text is read again, never taken from the index as it was: what
+    XYMONAPI_HIDE hides today must leave the index, though it was indexed
+    before the expression was added."""
     import xymonapi_client as client     # xymonapi beside this plugin
     src = _history_source()
-    known = known or {}
     out = []
     try:
         for ev in _events_since(src, since):
-            key = ("history", ev["entity"], ev["test"], ev["epoch"])
-            if key in known:
-                out.append(known[key])
-                continue
             try:
                 log = src.histlog(ev["entity"], ev["test"], ev["epoch"])[:HISTLOG_TEXT]
             except client.APIError as e:
@@ -365,12 +362,14 @@ def build(docs: str, since: str | None, full: bool = False) -> tuple[int, int]:
             known = {_key(p): (p, v) for p, v in zip(passages, vectors)}
         except (IndexProblem, OSError):
             pass
-    passages = (docs_passages(docs) if docs else []) + \
-               (history_passages(since, {k: pv[0] for k, pv in known.items()}) if since else [])
+    passages = (docs_passages(docs) if docs else []) + (history_passages(since) if since else [])
     if not passages:
         raise SystemExit("xymonapi-rag: nothing to index: set XYMONAPI_RAG_DOCS, "
                          "or let it read the history")
-    new = [i for i, p in enumerate(passages) if _key(p) not in known]
+    # A passage keeps its vector while its text is the same: a change whose
+    # text XYMONAPI_HIDE now hides is embedded again.
+    new = [i for i, p in enumerate(passages)
+           if _key(p) not in known or known[_key(p)][0]["text"] != p["text"]]
     fresh = embed([f'{passages[i]["title"]}\n{passages[i]["text"]}' for i in new]) if new \
         else np.zeros((0, 0), dtype="float32")
     if len(known) and new:

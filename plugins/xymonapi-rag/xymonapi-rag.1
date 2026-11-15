@@ -29,9 +29,10 @@ token or user below; an API older than the xymonapi version the PLUGIN file
 names is said on stderr, once, and nothing is updated. It
 cuts them into passages, one per manual-page
 section or item and one per change; and stores a vector for each in
-$XYMONAPI_RAG_INDEX. A passage the index holds already keeps its vector, and
-a change it holds has its text not fetched again, so a run that adds a
-day's changes takes seconds; \fB--full\fR embeds everything again. Run it
+$XYMONAPI_RAG_INDEX. A passage the index holds already, with the same text,
+keeps its vector, so a run that adds a day's changes takes little more than
+reading their texts again; every saved status is read again, so that what
+XYMONAPI_HIDE hides leaves the index though it was indexed before; \fB--full\fR embeds everything again. Run it
 to take in what has changed: the task \fBtasks.d/xymonapi-rag\fR, which
 installed off, does so once a day, and
 .I xymonapi(8)
