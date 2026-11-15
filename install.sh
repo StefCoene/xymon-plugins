@@ -562,19 +562,43 @@ installed_tasks() {
 # admin edited is kept: install_server set it aside; one an older version
 # shipped, unedited, takes this version's.
 
-# cfgval NAME -- NAME's value in the server's xymonserver.cfg, as written:
-# the last NAME= line, quotes and comment taken off.
+# cfgval NAME -- NAME's value in the server's configuration, as written:
+# the last NAME= line, quotes and comment taken off, of xymonserver.cfg and
+# then of the files in xymonserver.d/, which Xymon reads after it, leaving
+# out what it leaves out: dot-files, editor backups, README and packaging
+# leftovers.
+# ponytail: one level of xymonserver.d/, as the plugins write it; Xymon also
+# reads its subdirectories.
 cfgval() {
 	c=$(inside "$XYMONHOME/etc/xymonserver.cfg") || exit 1
+	d=$(inside "$XYMONHOME/etc/xymonserver.d") || exit 1
 	[ -f "$c" ] || return 0
-	sed -n -e "s/^[[:space:]]*$1=\"\([^\"]*\)\".*/\1/p" -e "s/^[[:space:]]*$1=\([^\"#[:space:]]*\).*/\1/p" "$c" | tail -n 1
+	for f in "$c" "$d"/*; do
+		[ -f "$f" ] || continue
+		case ${f##*/} in .*|*~|*,v|README*|*.dpkg-new|*.dpkg-orig|*.rpmsave|*.rpmorig|*.rpmnew) continue ;; esac
+		sed -n -e "s/^[[:space:]]*$1=\"\([^\"]*\)\".*/\1/p" -e "s/^[[:space:]]*$1=\([^\"#[:space:]]*\).*/\1/p" "$f"
+	done | tail -n 1
 }
 
 # rundir -- Xymon's directory for runtime files, where a plugin's sockets
-# go: XYMONRUNDIR of the server's xymonserver.cfg, or XYMONSERVERLOGS when it
-# is empty, as Xymon does. Empty when that is no absolute path written out
-# -- one that names a variable, say -- which the install cannot know.
+# go: XYMONRUNDIR, or XYMONSERVERLOGS when it is empty, as Xymon does. Asked
+# of Xymon itself first: xymoncmd loads xymonserver.cfg as xymonlaunch does
+# for the plugins' tasks -- its includes and directories, its variables
+# expanded, Xymon's defaults -- so the snippets name the socket the API
+# makes; with a clean environment, so that nothing of this shell's slips
+# in. Under DESTDIR the stage's xymoncmd is not run, being the installed
+# system's, and where it is missing or fails, the files are read here, as
+# cfgval reads them. Empty when that gives no absolute path -- one that names
+# a variable, read here -- which the install cannot know.
 rundir() {
+	if [ -z "$DESTDIR" ] && [ -x "$XYMONHOME/bin/xymoncmd" ]; then
+		# xymoncmd expands a $ in its own arguments: it runs env, and the
+		# two settings are read from what env prints.
+		e=$(env -i PATH=/usr/bin:/bin "$XYMONHOME/bin/xymoncmd" --env="$XYMONHOME/etc/xymonserver.cfg" env 2>/dev/null) || e=
+		r=$(printf '%s\n' "$e" | sed -n 's/^XYMONRUNDIR=//p' | tail -n 1)
+		[ -n "$r" ] || r=$(printf '%s\n' "$e" | sed -n 's/^XYMONSERVERLOGS=//p' | tail -n 1)
+		case $r in /*\$*) ;; /*) echo "$r"; return 0 ;; esac
+	fi
 	r=$(cfgval XYMONRUNDIR) || exit 1
 	[ -n "$r" ] || r=$(cfgval XYMONSERVERLOGS) || exit 1
 	case $r in /*\$*) ;; /*) echo "$r" ;; esac

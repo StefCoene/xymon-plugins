@@ -641,7 +641,13 @@ def main(argv: list[str]) -> int:
     global RELAY
     bound = []
     if args.relay_socket:
-        relay, at = _relay_socket(args.relay_socket)
+        # A path that changes under the check -- a link left dangling, a
+        # directory removed between two looks -- is a refusal too, never a
+        # crash of the API with its port and other socket.
+        try:
+            relay, at = _relay_socket(args.relay_socket)
+        except OSError as e:
+            relay, at = None, f"{e.filename or args.relay_socket}: {e.strerror or e}"
         if relay is None:
             RELAY = "refused"
             log.error("no relay socket at %s (XYMONAPI_RELAY_SOCKET): %s. The web server's relay to the API is "

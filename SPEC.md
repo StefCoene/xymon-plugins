@@ -218,10 +218,13 @@ The API's sockets are in its directory there,
 `XYMONRUNDIR` is empty, as Xymon does: `relay.sock` for the web server,
 and `local/api.sock` for the server's own programs, `local/` being the
 Xymon user's and its group's alone; the clients look for it there. The install writes that path into
-the web server snippets, read from the server's `xymonserver.cfg`, the last
-`XYMONRUNDIR=` line, quoted or not; where it is no absolute path written
-out -- one that names a variable -- the snippets keep `@XYMONRUNDIR@` and
-the install says so. The API makes its directories there when it starts and
+the web server snippets, asking Xymon's `xymoncmd`, which loads the
+server's configuration as xymonlaunch does for the API -- its includes,
+its variables, its defaults; under `DESTDIR`, or where `xymoncmd` is
+missing or fails, read from `xymonserver.cfg` and then the files of
+`xymonserver.d/`, the last `XYMONRUNDIR=` line, quoted or not. Where that
+gives no absolute path -- a variable read without Xymon -- the snippets
+keep `@XYMONRUNDIR@` and the install says so. The API makes its directories there when it starts and
 takes them away when it stops.
 
 ### Knowing what is installed
