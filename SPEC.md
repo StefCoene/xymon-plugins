@@ -35,7 +35,8 @@ to come.
   is a valid way to take a plugin away: no task of it runs, no setting of it
   applies, nothing of it is served, and no program reports an error. What is
   left is at most a link that points nowhere, which every reader skips, and
-  which the next removal takes away.
+  which the next removal takes away -- or a SELinux module, which grants
+  nothing while its booleans are off (S23).
 - **Installing does not enable.** An install puts the files in place and
   changes nothing that runs; switching a plugin on is a step of its own, and
   so is switching it off.
@@ -226,6 +227,18 @@ missing or fails, read from `xymonserver.cfg` and then the files of
 gives no absolute path -- a variable read without Xymon -- the snippets
 keep `@XYMONRUNDIR@` and the install says so. The API makes its directories there when it starts and
 takes them away when it stops.
+
+**S23. A plugin's SELinux module grants nothing until the admin says so.**
+A plugin that needs a SELinux rule ships it as a module, `NAME.cil` among
+its server files, named in its `PLUGIN` file's `selinux:` line. Where
+SELinux is active, `install-server` loads it with `semodule` and says how
+to switch it on: what it grants lies behind booleans, off. `uninstall-server`
+removes it, and an update to a version without one: the module named after
+the plugin, never one the installed `PLUGIN` copy names otherwise. Under
+`DESTDIR`, or where SELinux is not active, nothing is loaded. The module
+lies outside the plugin's directory: deleting `ext/NAME` by hand leaves it
+loaded, inert while its booleans are off, until the next removal through
+the command.
 
 ### Knowing what is installed
 

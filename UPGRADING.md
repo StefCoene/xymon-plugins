@@ -48,7 +48,8 @@ write it. On Homebrew, `/opt/homebrew`'s directories -- `opt`, `Cellar`,
 trusted with the API's passwords.
 `XYMONAPI_RELAY_SOCKET` set empty turns the relay off.
 Under SELinux, as with Xymon's RPM on RHEL, Apache must be allowed to
-connect to the socket.
+connect to the socket: from xymonapi 5.0.1 the install loads a module
+for it, its boolean off, `setsebool -P xymonapi_relay on`.
 
 ## Every install action names its side, install.sh from November 2026
 
