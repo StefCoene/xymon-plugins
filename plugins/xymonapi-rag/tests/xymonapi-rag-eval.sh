@@ -12,6 +12,10 @@
 #
 # Needs no xymond: the API is not asked (index --no-history). The embedding
 # model is the real one. Skips where the search cannot run.
+#
+# XYMONAPI_RAG_EVAL_INDEX names an index kept from an earlier run, as CI
+# keeps one: indexing keeps the vectors of the passages it already holds and
+# embeds only new ones, so the pages are still all indexed and scored.
 
 set -euo pipefail
 # shellcheck source=tests/lib/xymonapi.sh
@@ -20,7 +24,7 @@ set -euo pipefail
 ROOT=$(find_root)
 work=$(mktempdir)
 
-export XYMONAPI_RAG_DOCS="$XYMON_SRC" XYMONAPI_RAG_INDEX="$work/docs.npz"
+export XYMONAPI_RAG_DOCS="$XYMON_SRC" XYMONAPI_RAG_INDEX="${XYMONAPI_RAG_EVAL_INDEX:-$work/docs.npz}"
 rag() { "$ROOT/plugins/xymonapi-rag/xymonapi-rag.sh" "$@" 2> "$work/rag.err"; }
 
 rc=0
