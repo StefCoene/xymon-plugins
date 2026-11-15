@@ -183,7 +183,8 @@ adds:
   `https://xymon.example.ch:8443`, and pages at
   `https://xymon.example.ch/xymon/` the URL `https://xymon.example.ch`. The
   snippet passes the API to its relay socket,
-  `$XYMONHOME/tmp/xymonapi-relay/relay.sock` (`XYMONAPI_RELAY_SOCKET`), in
+  `$XYMONRUNDIR/xymonapi/relay.sock` (`XYMONAPI_RELAY_SOCKET`), in Xymon's
+  runtime directory -- its log directory when `XYMONRUNDIR` is empty -- in
   plain HTTP whether port 1986 speaks HTTPS or not; a password is asked
   there as on the port. Apache 2.4.7, nginx, or lighttpd 1.4.36 or later.
   Every directory on the way to the socket must be root's or the Xymon
@@ -194,8 +195,8 @@ adds:
   `XYMONAPI_RELAY_TRUSTED_GROUPS=admin` in `xymonserver.d/` trusts it, if
   every admin may see the API's passwords.
 - **An SSH tunnel**, for one person:
-  `ssh -L 1986:/usr/lib/xymon/server/tmp/xymonapi-relay/relay.sock xymon-server`,
-  to the relay socket under the server's `$XYMONHOME`. The URL:
+  `ssh -L 1986:/run/xymon/xymonapi/relay.sock xymon-server`, to the relay
+  socket in the server's `$XYMONRUNDIR`, here `/run/xymon`. The URL:
   `http://127.0.0.1:1986`, as if local.
 
 Plain HTTP across a network carries the password, the tokens and the status

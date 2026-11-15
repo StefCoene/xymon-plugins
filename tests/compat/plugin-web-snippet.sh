@@ -8,8 +8,11 @@
 # takes them away; the web server includes them in a way that skips a file
 # that is gone. An admin's edit survives an install. A snippet an older version shipped, found
 # unedited, takes this version's -- recognised under any tree, its path
-# put back as @XYMONHOME@; an edited one is kept, and said to differ. A tree whose path a web server's
-# configuration may not take as it is is said.
+# put back as @XYMONHOME@ and @XYMONRUNDIR@; an edited one is kept, and said to differ. A tree whose path a web server's
+# configuration may not take as it is is said. The relay socket they name
+# is in Xymon's runtime directory, read from the server's xymonserver.cfg:
+# XYMONRUNDIR, or XYMONSERVERLOGS where it is empty; where it is no path the
+# install can read, @XYMONRUNDIR@ stays, and the install says so.
 #
 # Installed into a scratch directory. That Apache's IncludeOptional and the
 # wildcard include of nginx and lighttpd skip a missing file is the web
@@ -29,14 +32,18 @@ snippets=$(sed -n 's/^conf: *//p' "$ROOT/plugins/xymonapi/PLUGIN")
 install() { "$ROOT/install.sh" install-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/$1.log" 2>&1 \
 	|| fail "install-server ($1) failed: $(tail -n 5 "$work/$1.log")"; }
 
-# A snippet as shipped, @XYMONHOME@ filled in as the task file's is.
-shipped() { sed -e "s|@XYMONHOME@|$2|g" "$1"; }
+# shipped SNIPPET HOME [RUNDIR] -- a snippet as shipped, @XYMONHOME@ filled
+# in as the task file's is, and @XYMONRUNDIR@, HOME/run by default, as
+# server_tree writes it.
+shipped() { sed -e "s|@XYMONHOME@|$2|g" -e "s|@XYMONRUNDIR@|${3-$2/run}|g" "$1"; }
 install first
 for c in $snippets; do
 	shipped "$ROOT/plugins/xymonapi/$c" "$home" > "$work/shipped"
 	cmp -s "$work/shipped" "$home/ext/xymonapi/$c" || fail "[S16] $c is not in ext/xymonapi as shipped, @XYMONHOME@ filled in"
-	grep -q '@XYMONHOME@' "$home/ext/xymonapi/$c" && fail "[S16] $c still names @XYMONHOME@"
+	grep -q '@XYMON' "$home/ext/xymonapi/$c" && fail "[S16] $c still names a placeholder"
 done
+assert_contains "$home/run/xymonapi/relay.sock" "$(cat "$home/ext/xymonapi/xymonapi-nginx.conf")" \
+	"[S22] the snippet names the relay socket in XYMONRUNDIR, from xymonserver.cfg"
 assert_contains "IncludeOptional" "$(cat "$work/first.log")" "[S16] the install says to include it with IncludeOptional"
 
 echo "# the admin's port" >> "$home/ext/xymonapi/xymonapi-nginx.conf"
@@ -95,7 +102,7 @@ for h in "$work/treeA" "$work/tree B"; do
 	"$next/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manA" >"$work/next.log" 2>&1 || fail "the next version's install under $h failed"
 	assert_contains "# the next version's" "$(cat "$h/ext/xymonapi/xymonapi-nginx.conf")" "[S16] this version's snippet under $h is recognised as shipped, and replaced"
 done
-assert_contains "holds characters a web server's configuration may not take" "$(cat "$work/next.log")" \
+assert_contains "hold characters a web server's configuration may not take" "$(cat "$work/next.log")" \
 	"[S16] a tree whose path a web server may not take as it is is said"
 
 # Under a tree whose path is also part of the snippets' text -- /xymon in
@@ -106,8 +113,36 @@ assert_contains "holds characters a web server's configuration may not take" "$(
 cp "$work/stock-old" "$work/stage/xymon/ext/xymonapi/xymonapi-nginx.conf"
 "$repo/install.sh" install-server xymonapi XYMONHOME=/xymon DESTDIR="$work/stage" MANDIR=/usr/share/man >"$work/xymon.log" 2>&1 \
 	|| fail "install-server under DESTDIR at /xymon failed"
-shipped "$repo/plugins/xymonapi/xymonapi-nginx.conf" /xymon > "$work/shipped"
+shipped "$repo/plugins/xymonapi/xymonapi-nginx.conf" /xymon @XYMONRUNDIR@ > "$work/shipped"
 cmp -s "$work/shipped" "$work/stage/xymon/ext/xymonapi/xymonapi-nginx.conf" \
 	|| fail "[S16] under /xymon, an older version's snippet was taken for edited"
 
-pass "a plugin's web server snippets live in ext/PLUGIN, keep the admin's edits, go with the plugin, and an older version's, unedited, is replaced by this one's"
+# Where XYMONRUNDIR is empty, XYMONSERVERLOGS, as Xymon does; where it
+# names a variable, the install cannot know it: @XYMONRUNDIR@ stays, said.
+cfgcase() {
+	h=$work/$1; server_tree "$h"
+	printf '%s\noptional directory %s/etc/xymonserver.d\n' "$2" "$h" > "$h/etc/xymonserver.cfg"
+	"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/man$1" >"$work/$1.log" 2>&1 || fail "install-server ($1) failed"
+	cat "$h/ext/xymonapi/xymonapi-nginx.conf"
+}
+assert_contains "/var/log/xymon/xymonapi/relay.sock" "$(cfgcase logs 'XYMONRUNDIR=""
+XYMONSERVERLOGS="/var/log/xymon"    # Logs')" "[S22] with XYMONRUNDIR empty, the snippet names XYMONSERVERLOGS"
+assert_contains "/run/xymon/xymonapi/relay.sock" "$(cfgcase plain 'XYMONRUNDIR=/run/xymon')" "[S22] an unquoted XYMONRUNDIR is read"
+assert_contains "@XYMONRUNDIR@/xymonapi/relay.sock" "$(cfgcase var 'XYMONRUNDIR="$XYMONVAR/run"')" "[S22] one that names a variable is left as @XYMONRUNDIR@"
+assert_contains "put Xymon's runtime directory in its place" "$(cat "$work/var.log")" "[S22] and the install says so"
+
+# xymonapi 4.0.0's snippets, with the relay under $XYMONHOME/tmp, are
+# recognised unedited, by this version's conf-stock lines, and replaced.
+h=$work/v4; server_tree "$h"
+"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manv4" >/dev/null 2>&1 || fail "install-server (v4) failed"
+for c in $snippets; do
+	sed -e 's|@XYMONRUNDIR@/xymonapi/relay.sock|@XYMONHOME@/tmp/xymonapi-relay/relay.sock|' -e "s|@XYMONHOME@|$h|g" \
+		"$ROOT/plugins/xymonapi/$c" > "$h/ext/xymonapi/$c"
+done
+"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manv4" >"$work/v4.log" 2>&1 || fail "install-server (v4 again) failed"
+for c in $snippets; do
+	shipped "$ROOT/plugins/xymonapi/$c" "$h" > "$work/shipped"
+	cmp -s "$work/shipped" "$h/ext/xymonapi/$c" || fail "[S22] xymonapi 4.0.0's $c, unedited, was not replaced by this version's"
+done
+
+pass "a plugin's web server snippets live in ext/PLUGIN, keep the admin's edits, go with the plugin, an older version's, unedited, is replaced by this one's, and the relay socket they name is in Xymon's runtime directory"

@@ -80,10 +80,12 @@ fi
 
 # The Unix socket the web server relays to, whatever the port speaks, so
 # that its snippets need not follow the certificates; a password is asked
-# there as on the port. XYMONAPI_RELAY_SOCKET, by default under
-# $XYMONHOME/tmp, where the snippets, written at install, look for it; set
+# there as on the port. XYMONAPI_RELAY_SOCKET, by default in Xymon's
+# runtime directory -- XYMONRUNDIR, or XYMONSERVERLOGS when it is empty, as
+# Xymon does -- where the snippets, written at install, look for it; set
 # empty, none.
-relay=${XYMONAPI_RELAY_SOCKET-${XYMONHOME:+$XYMONHOME/tmp/xymonapi-relay/relay.sock}}
+run=${XYMONRUNDIR:-${XYMONSERVERLOGS:-}}
+relay=${XYMONAPI_RELAY_SOCKET-${run:+$run/xymonapi/relay.sock}}
 
 cd "$here" || exit 1
 # By its full path, as the task names it: a restart finds the API by its

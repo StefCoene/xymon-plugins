@@ -4,7 +4,8 @@
 # plugins/xymonapi/tests/xymonapi-relay.sh
 #
 # The relay socket for the web server: with XYMONAPI_RELAY_SOCKET, the API
-# also answers on that Unix socket, in plain HTTP, whether its port speaks
+# also answers on that Unix socket -- by default in Xymon's runtime
+# directory, XYMONRUNDIR or XYMONSERVERLOGS (S22) -- in plain HTTP, whether its port speaks
 # HTTPS or not, so that the web server's snippets need not follow the
 # certificates. There, as on the port, a password is asked when
 # XYMONAPI_PASSWD is set (C3); the socket for this machine's programs keeps
@@ -59,6 +60,18 @@ local_health() { curl -s --max-time 5 --unix-socket "$work/api.sock" http://loca
 start_api
 assert_contains '"relay":"disabled"' "$(api_get /health)" "with no relay socket asked for, /health says disabled"
 stop_process "$API_PID"; API_PID=""
+
+# Asked for nothing, the launcher puts it in Xymon's runtime directory,
+# XYMONRUNDIR, or XYMONSERVERLOGS where that is empty, as Xymon does: where
+# the installed snippets look for it.
+mkdir -p "$work/run" "$work/logs"
+XYMONRUNDIR="$work/run" API_RELAY_DEFAULT=1 start_api
+[ -S "$work/run/xymonapi/relay.sock" ] || fail "[S22] the relay socket is not in XYMONRUNDIR/xymonapi"
+stop_process "$API_PID"; API_PID=""
+XYMONRUNDIR="" XYMONSERVERLOGS="$work/logs" API_RELAY_DEFAULT=1 start_api
+[ -S "$work/logs/xymonapi/relay.sock" ] || fail "[S22] with XYMONRUNDIR empty, the relay socket is not in XYMONSERVERLOGS/xymonapi"
+stop_process "$API_PID"; API_PID=""
+assert_equal "" "$(ls -A "$work/run"; ls -A "$work/logs")" "[S22] and the API takes its directory away when it stops"
 
 # The port in HTTPS, the relay socket in HTTP, the other socket as it was.
 XYMONAPI_RELAY_SOCKET=$relay start_api

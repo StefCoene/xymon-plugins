@@ -5,6 +5,19 @@ its version, what breaks, and what to do. Every other change needs nothing
 but installing the new code (see each plugin's README). CI refuses a change
 that breaks the API's contract without a line here.
 
+## The relay socket moves to Xymon's runtime directory, from xymonapi 5.0.0
+
+The web server's relay socket is now `$XYMONRUNDIR/xymonapi/relay.sock`,
+in the directory Xymon keeps for its sockets, or in its log directory,
+`$XYMONSERVERLOGS`, when `XYMONRUNDIR` is empty, as Xymon does. It was
+`$XYMONHOME/tmp/xymonapi-relay/relay.sock`. The install reads the directory
+from `$XYMONHOME/etc/xymonserver.cfg` and replaces a 4.0.0 snippet it finds
+unedited. What breaks: a snippet you edited is kept, and the install says
+it differs: put the new socket path in it. Where `XYMONRUNDIR` names a
+variable the install cannot read, the snippets keep `@XYMONRUNDIR@`, and
+the install says to put the directory there. An SSH tunnel goes to the new
+path. Setting `XYMONAPI_RELAY_SOCKET` keeps the socket where you name it.
+
 ## The web server reaches the API on its relay socket, from xymonapi 4.0.0
 
 The API now also answers on a Unix socket for the web server,

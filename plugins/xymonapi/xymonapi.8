@@ -1,4 +1,4 @@
-.TH XYMONAPI 8 "November 14, 2026" "xymon-plugins"
+.TH XYMONAPI 8 "November 15, 2026" "xymon-plugins"
 .SH NAME
 xymonapi \- read-only HTTP and JSON interface to the Xymon server
 .SH SYNOPSIS
@@ -34,7 +34,7 @@ is the file openapi.yaml beside the program.
 It has three doors. The port, 127.0.0.1:1986 by default, in HTTPS when it
 has a certificate, is for other machines: every request there but /plugins
 needs a user's password or a client token (TOKENS). The relay socket,
-$XYMONHOME/tmp/xymonapi-relay/relay.sock by default, is the same in plain
+$XYMONRUNDIR/xymonapi/relay.sock by default, is the same in plain
 HTTP, for the web server and an SSH tunnel, whether the port speaks HTTPS
 or not: a password or token is needed there too (XYMONAPI_RELAY_SOCKET
 under ENVIRONMENT). The other Unix socket,
@@ -236,8 +236,10 @@ The address and port to listen on, as HOST:PORT or [ADDRESS]:PORT for IPv6.
 The default is 127.0.0.1:1986, which only this machine reaches.
 .IP "\fBXYMONAPI_RELAY_SOCKET\fR"
 The Unix socket the snippets under FILES pass /xymon/api/ to:
-$XYMONHOME/tmp/xymonapi-relay/relay.sock by default, the path the snippets
-are written with at install; none when set to the empty string. It speaks
+$XYMONRUNDIR/xymonapi/relay.sock by default, in Xymon's runtime directory
+-- $XYMONSERVERLOGS when XYMONRUNDIR is empty, as Xymon does -- the path
+the snippets are written with at install, which reads it from
+$XYMONHOME/etc/xymonserver.cfg; none when set to the empty string. It speaks
 plain HTTP whether the port speaks HTTPS or not, so that the web server
 need not follow the certificates, and asks the same password or token. Any
 user of this machine may connect to it, mode 666, as any may reach the
@@ -385,7 +387,7 @@ From other machines, use HTTPS: with xymond's certificate the API speaks it
 itself (XYMONAPI_TLS_CERT), and where the web server has a certificate the
 snippets under FILES pass /xymon/api/ to the API's relay socket over it.
 An SSH tunnel to the relay socket is encrypted too, with nothing to set up:
-ssh -L 1986:$XYMONHOME/tmp/xymonapi-relay/relay.sock HOST. A client is given
+ssh -L 1986:$XYMONRUNDIR/xymonapi/relay.sock HOST. A client is given
 the URL that reaches the API, scheme, host and port, without /xymon/api/v1,
 which it adds: https://HOST:1986 for the API's own HTTPS; the web server's,
 https://HOST, or https://HOST:PORT when its HTTPS port is not 443, for the

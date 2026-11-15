@@ -549,37 +549,60 @@ installed_tasks() {
 # admin edited is kept: install_server set it aside; one an older version
 # shipped, unedited, takes this version's.
 
+# cfgval NAME -- NAME's value in the server's xymonserver.cfg, as written:
+# the last NAME= line, quotes and comment taken off.
+cfgval() {
+	c=$(inside "$XYMONHOME/etc/xymonserver.cfg") || exit 1
+	[ -f "$c" ] || return 0
+	sed -n -e "s/^[[:space:]]*$1=\"\([^\"]*\)\".*/\1/p" -e "s/^[[:space:]]*$1=\([^\"#[:space:]]*\).*/\1/p" "$c" | tail -n 1
+}
+
+# rundir -- Xymon's directory for runtime files, where a plugin's sockets
+# go: XYMONRUNDIR of the server's xymonserver.cfg, or XYMONSERVERLOGS when it
+# is empty, as Xymon does. Empty when that is no absolute path written out
+# -- one that names a variable, say -- which the install cannot know.
+rundir() {
+	r=$(cfgval XYMONRUNDIR) || exit 1
+	[ -n "$r" ] || r=$(cfgval XYMONSERVERLOGS) || exit 1
+	case $r in /*\$*) ;; /*) echo "$r" ;; esac
+}
+
 # stock PLUGIN SNIPPET -- the snippet as this version ships it, @XYMONHOME@
-# filled in, as the task file's is: what it names lies under the server's
-# tree, which only the install knows.
+# and @XYMONRUNDIR@ filled in, as the task file's is: what it names lies
+# under the server's tree, which only the install knows. @XYMONRUNDIR@ stays
+# where rundir is empty.
 stock() {
-	sed -e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g" "$ROOT/plugins/$1/$2"
+	sed -e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g" ${RUNDIR:+-e "s|@XYMONRUNDIR@|$(sedesc "$RUNDIR")|g"} "$ROOT/plugins/$1/$2"
 }
 
 # shipped PLUGIN SNIPPET FILE -- true when FILE is, byte for byte, the
 # snippet as an older version shipped it: its cksum is among the plugin's
-# conf-stock lines, as it is, or with $XYMONHOME put back as @XYMONHOME@ so
-# that the same snippet installed under any tree gives the same one. As it
-# is first: a snippet without @XYMONHOME@ is then recognised whatever the
-# tree, though $XYMONHOME may also be part of its text (/xymon in
-# /xymon/api/). Where that putting back cannot tell, the snippet is taken
-# for edited: kept, and said to differ, never overwritten.
+# conf-stock lines, as it is, or with $XYMONHOME put back as @XYMONHOME@, or
+# $RUNDIR as @XYMONRUNDIR@ and then $XYMONHOME, so that the same snippet
+# installed under any tree gives the same one. As it is first: a snippet
+# without a placeholder is then recognised whatever the tree, though
+# $XYMONHOME may also be part of its text (/xymon in /xymon/api/). Where
+# that putting back cannot tell, the snippet is taken for edited: kept, and
+# said to differ, never overwritten.
 shipped() {
 	list="
 $(field "$1" conf-stock)
 "
-	sum=$(cksum < "$3" | cut -d' ' -f1,2)
-	case $list in *"
+	for way in raw home ${RUNDIR:+run}; do
+		sum=$(awk -v way="$way" -v h="$XYMONHOME" -v r="$RUNDIR" '
+		function back(s, p, name,    out, i) {
+			out = ""
+			while ((i = index(s, p)) > 0) { out = out substr(s, 1, i - 1) name; s = substr(s, i + length(p)) }
+			return out s
+		}
+		{ s = $0
+		  if (way == "run") s = back(s, r, "@XYMONRUNDIR@")
+		  if (way != "raw") s = back(s, h, "@XYMONHOME@")
+		  print s }' "$3" | cksum | cut -d' ' -f1,2)
+		case $list in *"
 $2 $sum
 "*) return 0 ;; esac
-	sum=$(awk -v h="$XYMONHOME" '{
-		out = ""; s = $0
-		while ((i = index(s, h)) > 0) { out = out substr(s, 1, i - 1) "@XYMONHOME@"; s = substr(s, i + length(h)) }
-		print out s
-	}' "$3" | cksum | cut -d' ' -f1,2)
-	case $list in *"
-$2 $sum
-"*) return 0 ;; esac
+	done
 	return 1
 }
 
@@ -590,11 +613,15 @@ same() {
 }
 
 conf() {
-	# The snippets name a path under $XYMONHOME; one a web server's
-	# configuration cannot take as it is is said, for the admin to write.
-	case $XYMONHOME in
-		*[!A-Za-z0-9._/+-]*) echo "The web server snippets in $EXTROOT/$1 name $XYMONHOME, which holds characters a web server's configuration may not take as they are: check the path in the snippet you include." ;;
+	# The snippets name a path under $XYMONHOME and Xymon's runtime
+	# directory; one a web server's configuration cannot take as it is is
+	# said, for the admin to write, and so is a runtime directory the
+	# install cannot know.
+	RUNDIR=$(rundir) || exit 1
+	case $XYMONHOME$RUNDIR in
+		*[!A-Za-z0-9._/+-]*) echo "The web server snippets in $EXTROOT/$1 name $XYMONHOME${RUNDIR:+ and $RUNDIR}, which hold characters a web server's configuration may not take as they are: check the path in the snippet you include." ;;
 	esac
+	[ -n "$RUNDIR" ] || echo "The web server snippets in $EXTROOT/$1 name @XYMONRUNDIR@: $XYMONHOME/etc/xymonserver.cfg gives XYMONRUNDIR, or XYMONSERVERLOGS, as no path the install can read; put Xymon's runtime directory in its place in the snippet you include."
 	for c in $(field "$1" conf); do
 		dst=$EXTROOT/$1/$c
 		if [ -f "$EXTROOT/.$1.$c" ]; then
@@ -612,7 +639,7 @@ conf() {
 			stock "$1" "$c" > "$dst" && chmod 644 "$dst" || exit 1
 			echo "$dst, an older version's as shipped, is replaced by this version's"
 		else
-			echo "$dst is kept as edited; this version's differs: compare it with $ROOT/plugins/$1/$c, @XYMONHOME@ being $XYMONHOME"
+			echo "$dst is kept as edited; this version's differs: compare it with $ROOT/plugins/$1/$c, @XYMONHOME@ being $XYMONHOME${RUNDIR:+ and @XYMONRUNDIR@ $RUNDIR}"
 		fi
 	done
 }
