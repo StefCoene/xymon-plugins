@@ -63,11 +63,28 @@ jobs:
           ./configure --server
           make -j"$(nproc)"
 
+      # The search's embedding model, downloaded otherwise at each run, and
+      # the index of every Xymon manual page the eval test builds, nearly
+      # four minutes of CPU. An index keeps the vectors of the passages it
+      # holds and embeds only new ones, so a change to the pages is still
+      # indexed; a change to how passages are cut or embedded, or to the
+      # modules, changes the key, and the index is built afresh. Saved by a
+      # run on main, read by pull requests.
+      - name: Cache the search's model and index
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ runner.temp }}/fastembed
+            ${{ runner.temp }}/rag-eval
+          key: rag-${{ hashFiles('plugins-repo/plugins/xymonapi-rag/xymonrag.py', 'plugins-repo/plugins/xymonapi-rag/requirements.txt') }}
+
       - name: Test
         env:
           XYMON_SRC: ${{ github.workspace }}/xymon
           XYMONAPI_PYTHON: ${{ runner.temp }}/venv/bin/python3
           XYMONAPI_NO_SKIP: "1"
+          FASTEMBED_CACHE_PATH: ${{ runner.temp }}/fastembed
+          XYMONAPI_RAG_EVAL_INDEX: ${{ runner.temp }}/rag-eval/docs.npz
         run: plugins-repo/tests/run.sh
 
   # The API's contract changes only with its version: build/contract-check.sh
