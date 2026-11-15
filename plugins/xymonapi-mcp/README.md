@@ -44,7 +44,7 @@ server; an AI tool that is neither of those two is [registered by
 hand](#registering-it-by-hand).
 
 On the Xymon server itself, give `register` the API's socket instead of a
-URL: `unix:$XYMONVAR/xymonapi/api.sock`. Nothing is asked and no token is
+URL: `unix:$XYMONRUNDIR/xymonapi/local/api.sock`. Nothing is asked and no token is
 kept, since the socket's permissions already say who may read the API
 (`xymonapi.8`, `XYMONAPI_SOCKET`).
 

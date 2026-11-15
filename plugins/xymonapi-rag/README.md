@@ -45,7 +45,7 @@ changes at most, and the API serves it as soon as it is written.
 From a shell on the server, the installed launcher searches with no
 setting and no token when run through `xymoncmd`, which gives it Xymon's
 settings: as the Xymon user it reads the index where the task wrote it,
-and otherwise asks the API through its socket, `$XYMONVAR/xymonapi/api.sock`
+and otherwise asks the API through its socket, `$XYMONRUNDIR/xymonapi/local/api.sock`
 (`xymonapi.8`, `XYMONAPI_SOCKET`):
 
 ```sh

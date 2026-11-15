@@ -5,7 +5,8 @@ server and the search in xymonapi-rag/ both read the API through it.
 XYMONAPI_URL is where the API is: http:// or https://, or unix:PATH, the
 API's own Unix socket on the server, where no credential is needed because
 the socket's permissions already say who may connect. Unset, it is that
-socket, XYMONAPI_SOCKET or $XYMONVAR/xymonapi/api.sock, when the file is
+socket, XYMONAPI_SOCKET or $XYMONRUNDIR/xymonapi/local/api.sock
+($XYMONSERVERLOGS when XYMONRUNDIR is empty), when the file is
 there -- the plugins' tasks on the server have both settings -- and
 http://127.0.0.1:1986 otherwise.
 XYMONAPI_TOKEN_FILE names a file holding a client token -- the one
@@ -40,8 +41,9 @@ from urllib.parse import quote, unquote, urlencode, urlsplit
 
 
 def _default_url() -> str:
+    run = os.environ.get("XYMONRUNDIR") or os.environ.get("XYMONSERVERLOGS")
     sock = os.environ.get("XYMONAPI_SOCKET") or (
-        os.path.join(os.environ["XYMONVAR"], "xymonapi", "api.sock") if os.environ.get("XYMONVAR") else "")
+        os.path.join(run, "xymonapi", "local", "api.sock") if run else "")
     return f"unix:{sock}" if sock and os.path.exists(sock) else "http://127.0.0.1:1986"
 
 

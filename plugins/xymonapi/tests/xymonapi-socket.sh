@@ -4,14 +4,15 @@
 # plugins/xymonapi/tests/xymonapi-socket.sh
 #
 # Beside its port the API listens on a Unix socket, XYMONAPI_SOCKET or
-# $XYMONVAR/xymonapi/api.sock, mode 660 in a directory of 750, for this
+# $XYMONRUNDIR/xymonapi/local/api.sock (S22), mode 660 in a directory of
+# 750, for this
 # machine's own clients: a request there needs no password, since the
 # socket's permissions already decided who connects, while the same request
 # on the port is still refused without one. The token operations are the
 # exception, refused through the socket, because they say who the caller is.
-# The socket is removed when the API stops, and not made when the setting is
-# empty. The client takes unix:PATH as its URL, and that socket by default
-# when XYMONVAR says where it is: xymonapi-connect over it asks nothing and
+# The socket is removed when the API stops, with the directories it made,
+# and not made when the setting is empty. The client takes unix:PATH as its
+# URL, and that socket by default when XYMONRUNDIR says where it is: xymonapi-connect over it asks nothing and
 # keeps no token, and the MCP server reads the API through it.
 #
 # Skips where the API cannot run (tests/lib/xymonapi.sh). Needs the xymon
@@ -36,15 +37,16 @@ htpasswd -cb "$work/htpasswd" alice secret 2>/dev/null
 # Every answer checked here needs no xymond: /health says alive:false
 # without one, and the password is checked first.
 export XYMON="$XYMONCLIENT" XYMSRV="127.0.0.1:1" XYMONAPI_PASSWD="$work/htpasswd" \
-	XYMONAPI_TOKENS="$work/var/xymonapi/tokens" XYMONVAR="$work/var"
-sock=$work/var/xymonapi/api.sock
+	XYMONAPI_TOKENS="$work/var/xymonapi/tokens" XYMONRUNDIR="$work/run"
+mkdir -p "$work/run"
+sock=$work/run/xymonapi/local/api.sock
 start_api
 
 # over PATH -- the status, and the body, of PATH asked through the socket.
 over() { curl -s --unix-socket "$sock" -o /dev/null -w '%{http_code}' --max-time 30 "http://localhost$1"; }
 
-assert_equal "srw-rw----" "$(ls -ld "$sock" | cut -c1-10)" "the socket, mode 660, where XYMONVAR says"
-assert_equal "drwxr-x---" "$(ls -ld "$work/var/xymonapi" | cut -c1-10)" "in a directory of mode 750"
+assert_equal "srw-rw----" "$(ls -ld "$sock" | cut -c1-10)" "[S22] the socket, mode 660, in XYMONRUNDIR/xymonapi/local"
+assert_equal "drwxr-x---" "$(ls -ld "$work/run/xymonapi/local" | cut -c1-10)" "in a directory of mode 750"
 assert_contains "listening on the socket $sock" "$(cat "$work/api.log")" "the log says so"
 assert_equal "401" "$(api_code /health)" "[C3] the port, without a user: refused as before"
 assert_equal "200" "$(over /xymon/api/v1/health)" "the socket, without a user: answered"
@@ -74,15 +76,16 @@ mcp "unix:$sock" '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name"
 assert_contains 'alive\": false' "$(cat "$work/mcp.out")" "the MCP server's health tool, through the socket"
 assert_not_contains "isError\":true" "$(cat "$work/mcp.out")" "with no error"
 
-# With no XYMONAPI_URL, a client on the server takes the socket XYMONVAR
+# With no XYMONAPI_URL, a client on the server takes the socket XYMONRUNDIR
 # leads to.
 mcp "" '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"health","arguments":{}}}' \
 	|| fail "the MCP server with no URL exited with $?: $(cat "$work/mcp.err")"
-assert_contains 'alive\": false' "$(cat "$work/mcp.out")" "the MCP server with no XYMONAPI_URL finds the socket through XYMONVAR"
+assert_contains 'alive\": false' "$(cat "$work/mcp.out")" "the MCP server with no XYMONAPI_URL finds the socket through XYMONRUNDIR"
 
 stop_process "$API_PID"
 API_PID=""
 [ -e "$sock" ] && fail "the socket $sock is still there after the API stopped"
+assert_equal "" "$(ls -A "$work/run")" "[S22] and the directories it made in XYMONRUNDIR are gone"
 
 # XYMONAPI_SOCKET names another; set empty, there is none.
 XYMONAPI_SOCKET="$work/other.sock" start_api

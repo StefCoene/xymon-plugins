@@ -46,7 +46,7 @@ MCP = HERE.parent / "xymonapi-mcp" / "xymonapi-mcp.sh"
 # What the Xymon MCP server reads to find the API: handed to it as its
 # environment, each when set, so a backend's own configuration plays no part.
 MCP_ENV = ["XYMONAPI_URL", "XYMONAPI_TOKEN", "XYMONAPI_TOKEN_FILE", "XYMONAPI_CA",
-           "XYMONAPI_SOCKET", "XYMONVAR", "XYMONAPI_PYTHON"]
+           "XYMONAPI_SOCKET", "XYMONRUNDIR", "XYMONSERVERLOGS", "XYMONAPI_PYTHON"]
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "xymonapi-agent"
 STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "xymonapi-agent"
 TIMEOUT = float(os.environ.get("XYMONAPI_AGENT_TIMEOUT", "600"))
