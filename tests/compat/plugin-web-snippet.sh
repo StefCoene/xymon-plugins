@@ -139,6 +139,23 @@ echo 'XYMONRUNDIR="/backup/run"' > "$h/etc/xymonserver.d/local.cfg~"
 "$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/mandropin" >"$work/dropin.log" 2>&1 || fail "install-server (dropin) failed"
 assert_contains "/run/xymon/xymonapi/relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-nginx.conf")" "[S22] XYMONRUNDIR set in xymonserver.d/ wins over xymonserver.cfg's"
 
+# With Xymon's xymoncmd in the tree, Xymon reads its configuration itself,
+# as xymonlaunch does for the API: a value naming a variable is expanded.
+# Under DESTDIR the stage's xymoncmd is not run, and the variable stays
+# unknown.
+if [ -x "${XYMON_SRC:-}/common/xymoncmd" ]; then
+	h=$work/xcmd; server_tree "$h"
+	cp "$XYMON_SRC/common/xymoncmd" "$h/bin/"
+	printf 'XYMONVAR="/var/lib/xymon"\nXYMONRUNDIR="$XYMONVAR/run"\noptional directory %s/etc/xymonserver.d\n' "$h" > "$h/etc/xymonserver.cfg"
+	"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manxcmd" >"$work/xcmd.log" 2>&1 || fail "install-server (xymoncmd) failed"
+	assert_contains "/var/lib/xymon/run/xymonapi/relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-nginx.conf")" "[S22] xymoncmd expands a XYMONRUNDIR that names a variable"
+	mkdir -p "$work/xstage/xh"; cp -R "$h/bin" "$h/etc" "$work/xstage/xh/"
+	"$ROOT/install.sh" install-server xymonapi XYMONHOME=/xh DESTDIR="$work/xstage" MANDIR=/usr/share/man >"$work/xstage.log" 2>&1 || fail "install-server (xymoncmd, DESTDIR) failed"
+	assert_contains "@XYMONRUNDIR@/xymonapi/relay.sock" "$(cat "$work/xstage/xh/ext/xymonapi/xymonapi-nginx.conf")" "[S22] under DESTDIR the stage's xymoncmd is not run"
+else
+	echo "NOTE: the xymoncmd part was not run: no common/xymoncmd in XYMON_SRC"
+fi
+
 # xymonapi 4.0.0's snippets, with the relay under $XYMONHOME/tmp, are
 # recognised unedited, by this version's conf-stock lines, and replaced.
 h=$work/v4; server_tree "$h"

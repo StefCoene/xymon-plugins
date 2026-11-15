@@ -581,10 +581,24 @@ cfgval() {
 }
 
 # rundir -- Xymon's directory for runtime files, where a plugin's sockets
-# go: XYMONRUNDIR of the server's xymonserver.cfg, or XYMONSERVERLOGS when it
-# is empty, as Xymon does. Empty when that is no absolute path written out
-# -- one that names a variable, say -- which the install cannot know.
+# go: XYMONRUNDIR, or XYMONSERVERLOGS when it is empty, as Xymon does. Asked
+# of Xymon itself first: xymoncmd loads xymonserver.cfg as xymonlaunch does
+# for the plugins' tasks -- its includes and directories, its variables
+# expanded, Xymon's defaults -- so the snippets name the socket the API
+# makes; with a clean environment, so that nothing of this shell's slips
+# in. Under DESTDIR the stage's xymoncmd is not run, being the installed
+# system's, and where it is missing or fails, the files are read here, as
+# cfgval reads them. Empty when that gives no absolute path -- one that names
+# a variable, read here -- which the install cannot know.
 rundir() {
+	if [ -z "$DESTDIR" ] && [ -x "$XYMONHOME/bin/xymoncmd" ]; then
+		# xymoncmd expands a $ in its own arguments: it runs env, and the
+		# two settings are read from what env prints.
+		e=$(env -i PATH=/usr/bin:/bin "$XYMONHOME/bin/xymoncmd" --env="$XYMONHOME/etc/xymonserver.cfg" env 2>/dev/null) || e=
+		r=$(printf '%s\n' "$e" | sed -n 's/^XYMONRUNDIR=//p' | tail -n 1)
+		[ -n "$r" ] || r=$(printf '%s\n' "$e" | sed -n 's/^XYMONSERVERLOGS=//p' | tail -n 1)
+		case $r in /*\$*) ;; /*) echo "$r"; return 0 ;; esac
+	fi
 	r=$(cfgval XYMONRUNDIR) || exit 1
 	[ -n "$r" ] || r=$(cfgval XYMONSERVERLOGS) || exit 1
 	case $r in /*\$*) ;; /*) echo "$r" ;; esac
