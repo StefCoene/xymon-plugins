@@ -10,7 +10,8 @@
 # where it shares a server's etc/ as on Debian; part of a pair and no marks
 # at all are refused, before anything changes -- so that a mistyped
 # XYMONHOME neither creates a tree nor removes a manual page. Under DESTDIR
-# no marks are read. Without XYMONHOME, the trees found are named.
+# no marks are read. Without XYMONHOME, the trees found are named,
+# Homebrew's among them.
 #
 # Installed into scratch trees; XYMON_PLUGINS_TREES points detection at them.
 
@@ -98,6 +99,16 @@ assert_contains "$work/server, a Xymon server" "$out" "[S18] without XYMONHOME, 
 assert_contains "$work/client, a Xymon client" "$out" "[S18] and the client's"
 assert_contains "$work/debian-client, a Xymon client" "$out" "[S18] a client sharing a server's etc/ named a client"
 assert_not_contains "$work/half," "$out" "[S18] part of a pair is no Xymon tree found"
+
+# Homebrew's server, under brew --prefix, is found with no
+# XYMON_PLUGINS_TREES; a brew of the test's own stands for Homebrew's.
+mkdir -p "$work/bin"
+printf '#!/bin/sh\n[ "$1" = --prefix ] && echo "%s/brew"\n' "$work" > "$work/bin/brew"
+chmod 755 "$work/bin/brew"
+server_tree "$work/brew/opt/xymon-server/server"
+rc=0
+out=$(PATH="$work/bin:$PATH" XYMON_PLUGINS_TREES="" "$ROOT/install.sh" install-server xymonapi MANDIR="$man" </dev/null 2>&1) || rc=$?
+assert_contains "$work/brew/opt/xymon-server/server, a Xymon server" "$out" "[S18] Homebrew's server tree is found"
 
 # Under DESTDIR without XYMONHOME, the host's trees are not read.
 rc=0

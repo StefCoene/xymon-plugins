@@ -260,7 +260,8 @@ marks() {
 }
 
 # xymon_trees -- the Xymon trees on this machine, "KIND DIR" each: those
-# XYMON_PLUGINS_TREES names, colon-separated, and the packages' usual paths.
+# XYMON_PLUGINS_TREES names, colon-separated, and the packages' usual paths,
+# Homebrew's among them where brew is installed.
 # It only tells what is here: nothing is chosen from it.
 # ponytail: fixed paths only; a running xymonlaunch's tree when a relocated
 # server needs finding, which ps cannot tell portably.
@@ -271,6 +272,7 @@ xymon_trees() {
 			/usr/local/xymon/client /home/xymon/server /home/xymon/client; do
 			printf '%s\n' "$t"
 		done
+		bp=$(brew --prefix 2>/dev/null) && [ -n "$bp" ] && printf '%s\n' "$bp/opt/xymon-server/server"
 	} | sort -u | while IFS= read -r t; do
 		[ -n "$t" ] || continue
 		k=$(marks "$t")
