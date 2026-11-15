@@ -12,7 +12,8 @@
 # at DESTDIR, a chain of links each in turn, a link higher up the path as
 # well as at its end. A link in a plugin's directory's place, where a file
 # is set aside, or at the stage's plugins/ is removed, not followed; a
-# command is written in place of a link; no virtualenv is made or used.
+# command is written in place of a link; no virtualenv is made or used. The
+# plugin's messages name the installed system's paths, not the stage's.
 #
 # The build host's directories are a scratch directory here, $host, which
 # the staged links name by its absolute path, as /etc/xymon would be named.
@@ -52,7 +53,11 @@ cycle() {   # cycle LABEL -- install, enable, disable, uninstall on the server
 
 # etc an absolute link, as Xymon's install makes it.
 fresh; mkdir -p "$stage$host/etc"; ln -s "$host/etc" "$stage$home/etc"
-run install server; run enable server
+run install server
+# Its messages are for the installed system: its paths, not the stage's.
+assert_contains "passwords: $home/etc/xymonpasswd," "$(cat "$work/run.log")" "[S21] a message names the path as installed"
+assert_not_contains "$stage" "$(grep 'xymonpasswd' "$work/run.log")" "[S21] not the stage's"
+run enable server
 check "etc an absolute link"
 assert_equal "$home/ext/xymonapi/tasks.cfg" "$(readlink "$stage$host/etc/tasks.d/xymonapi")" \
 	"[S21] the task link lies where etc's link points inside DESTDIR, naming the task as installed"

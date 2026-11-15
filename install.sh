@@ -149,9 +149,11 @@ held() {
 # sedesc TEXT -- TEXT escaped for the right-hand side of a sed s|||.
 sedesc() { printf '%s\n' "$1" | sed -e 's/[\\&|]/\\&/g'; }
 
-# say PLUGIN KEY -- print the plugin's message KEY, its placeholders filled.
+# say PLUGIN KEY -- print the plugin's message KEY, its placeholders filled
+# with the paths of the installed system, never the stage's under DESTDIR:
+# the message is for whoever runs that system.
 say() {
-	field "$1" "$2" | sed -e "s|@ETC@|$(sedesc "$ETC")|g" -e "s|@TASKDIR@|$(sedesc "$TASKDIR")|g" \
+	field "$1" "$2" | sed -e "s|@ETC@|$(sedesc "$XYMONHOME/etc")|g" -e "s|@TASKDIR@|$(sedesc "$XYMONHOME/etc/tasks.d")|g" \
 		-e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g"
 }
 
