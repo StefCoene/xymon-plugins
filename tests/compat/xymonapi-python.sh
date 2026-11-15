@@ -41,7 +41,9 @@ fake() { # DIR NAME
 	# Never through a link: a venv's python3 is one, to the interpreter
 	# itself, and writing through it would replace that interpreter.
 	rm -f "$1/python3"
-	printf '#!/bin/sh\nprintf "%%s %%s\\n" "%s" "$*" >> "%s/python.log"\nexit 0\n' "$2" "$work" > "$1/python3"
+	# Asked for its interpreter it names itself, and -m venv DIR makes
+	# DIR/bin/python3, as a real one does.
+	printf '#!/bin/sh\nprintf "%%s %%s\\n" "%s" "$*" >> "%s/python.log"\ncase "$*" in *executable*) echo "$0" ;; *"-m venv"*) for a; do d=$a; done; mkdir -p "$d/bin"; ln -s "$0" "$d/bin/python3" ;; esac\nexit 0\n' "$2" "$work" > "$1/python3"
 	chmod 755 "$1/python3"
 }
 fake "$work/has" has
@@ -141,7 +143,7 @@ assert_contains "Made $lib/venv from $work/has/python3" "$(cat "$work/install2.l
 
 # A virtualenv there that lacks a module: said, for ./install.sh venv-server, and nothing
 # fetched; one that has them: nothing said.
-mkdir -p "$lib/venv/bin"; cp "$work/lacks/python3" "$lib/venv/bin/python3"
+mkdir -p "$lib/venv/bin"; rm -f "$lib/venv/bin/python3"; cp "$work/lacks/python3" "$lib/venv/bin/python3"
 "$ROOT/install.sh" install-tools xymonapi-rag PREFIX="$prefix" >"$work/install3.log" 2>&1 \
 	|| fail "install.sh install-tools failed: $(tail -n 5 "$work/install3.log")"
 assert_contains "The virtualenv $lib/venv lacks fastembed numpy" "$(cat "$work/install3.log")" "a virtualenv lacking the modules is said"
@@ -203,6 +205,7 @@ done
 # A virtualenv there that lacks them: "y" installs them into it.
 pre=$work/offer-lacks
 mkdir -p "$pre/libexec/xymon-plugins/venv/bin"
+rm -f "$pre/libexec/xymon-plugins/venv/bin/python3"   # never through a link, as fake() says
 printf '#!/bin/sh\nprintf "lacksvenv %%s\\n" "$*" >> "%s/python.log"\ncase "$*" in *"print("*) echo "fastembed numpy" ;; *find_spec*) exit 1 ;; esac\nexit 0\n' "$work" > "$pre/libexec/xymon-plugins/venv/bin/python3"
 chmod 755 "$pre/libexec/xymon-plugins/venv/bin/python3"
 : > "$work/python.log"

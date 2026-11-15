@@ -726,15 +726,23 @@ venv_auto() {
 			esac
 			[ -n "$p" ] && [ -x "$p" ] || continue
 			"$p" -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null || continue
+			# One that prints no interpreter is none, whatever its exit
+			# status: an empty file runs as an empty script, and exits 0.
 			real=$("$p" -c 'import sys; print(sys.executable)' 2>/dev/null)
-			[ -n "$real" ] && [ -x "$real" ] && p=$real
+			[ -n "$real" ] || continue
+			[ -x "$real" ] && p=$real
 			[ -n "$newest" ] || newest=$p
 			"$p" -c 'import importlib.util as u, sys; sys.exit(any(u.find_spec(m) is None for m in sys.argv[1:]))' $modules 2>/dev/null || continue
 			py=$p; break 2
 		done
 	done
 	if [ -n "$py" ]; then
-		"$py" -m venv --system-site-packages "$root/venv" || exit 1
+		# It has the modules: where it cannot make a virtualenv -- Debian
+		# without python3-venv -- the plugins can still run with it.
+		if ! "$py" -m venv --system-site-packages "$root/venv" || [ ! -x "$root/venv/bin/python3" ]; then
+			echo "Could not make a virtualenv at $root/venv with $py (on Debian and Ubuntu, python3-venv provides what it needs): the plugins run with the python3 on PATH, or XYMONAPI_PYTHON=$py, which has the modules ($modules)."
+			return 0
+		fi
 		echo "Made $root/venv from $py ($("$py" -V 2>&1)), which has the modules this plugin needs ($modules): the plugins there run with it."
 	elif [ -n "$newest" ] && offer "$plugin needs $modules, which no Python here has${note:+ ($note)}. Make a virtualenv at $root/venv with $newest, and install them from PyPI?"; then
 		PYTHON=$newest "$ROOT/install.sh" "$target" || exit 1
@@ -750,7 +758,10 @@ venv_auto() {
 venv() {
 	[ -z "$DESTDIR" ] || die "a virtualenv is made on the installed system, not under DESTDIR: run this there, without DESTDIR"
 	[ -d "$1" ] || die "nothing is installed in $1 yet"
-	[ -x "$1/venv/bin/python3" ] || "$PYTHON" -m venv "$1/venv" || exit 1
+	if [ ! -x "$1/venv/bin/python3" ]; then
+		"$PYTHON" -m venv "$1/venv" || exit 1
+		[ -x "$1/venv/bin/python3" ] || die "$PYTHON made no virtualenv at $1/venv"
+	fi
 	for r in "$1"/*/requirements.txt; do
 		[ -e "$r" ] || continue
 		echo "installing the modules of $r"
