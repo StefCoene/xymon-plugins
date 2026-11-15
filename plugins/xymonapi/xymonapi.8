@@ -75,7 +75,8 @@ Each host on the board, once.
 The current status of HOST's TEST, from xymondboard: its verdict, when it
 last changed (time) and was last reported (updated), and its text -- what
 the web page shows, written by the monitored host or the test. When it is
-acknowledged -- until the acknowledgement's end time -- or the test disabled
+acknowledged -- with xymondack or from the critical-systems view, until the
+acknowledgement's end time, the one running longest if both -- or the test disabled
 -- by hand, or blue from a DOWNTIME tag in hosts.cfg -- that is said too,
 with the words given and until when. The command line that set the status
 is left out of the text, as the web page leaves it out. HOST and TEST are

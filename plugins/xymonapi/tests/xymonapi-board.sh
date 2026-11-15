@@ -28,7 +28,7 @@ work=$(mktempdir)
 XYMOND_PID=""
 register_cleanup 'stop_process "$API_PID" "$XYMOND_PID"'
 
-printf 'page test Test\n127.0.0.1 red.example.com # conn\n127.0.0.1 green.example.com # conn\n127.0.0.1 disk.example.com # disk\n127.0.0.1 dis.example.com # conn\n127.0.0.1 disk2.example.com # disk\n127.0.0.1 enc.example.com # conn\n127.0.0.1 lt.example.com # conn\n127.0.0.1 enc2.example.com # procs\n' > "$work/hosts.cfg"
+printf 'page test Test\n127.0.0.1 red.example.com # conn\n127.0.0.1 green.example.com # conn\n127.0.0.1 disk.example.com # disk\n127.0.0.1 dis.example.com # conn\n127.0.0.1 disk2.example.com # disk\n127.0.0.1 enc.example.com # conn\n127.0.0.1 lt.example.com # conn\n127.0.0.1 enc2.example.com # procs\n127.0.0.1 crit.example.com # conn\n127.0.0.1 critold.example.com # conn\n' > "$work/hosts.cfg"
 
 mkdir -p "$work/home/etc" "$work/home/tmp" "$work/home/www"
 require_cfg XYMONSERVER_CFG "$XYMON_SRC/xymond/etcfiles/xymonserver.cfg"
@@ -72,7 +72,23 @@ send "status+5h/group:ops lt,example,com.conn green up for 5h"
 cookie=$("$XYMONCLIENT" "127.0.0.1:$PORT" "xymondboard host=red.example.com test=conn fields=cookie")
 [ -n "$cookie" ] || fail "xymond gave the red status no cookie"
 send "xymondack $cookie 0 already over"
-sleep 0.4
+# Acknowledged from the critical-systems view: ackinfo puts it in acklist,
+# HOST.TEST, level, seconds, who and words on lines of their own
+# (web/ackinfo.c), and leaves acktime at 0. One for an hour; one for a
+# second, which has run out by the time it is asked for.
+send "status crit,example,com.conn red down"
+send "status critold,example,com.conn red down"
+send "ackinfo crit.example.com.conn
+1
+3600
+alice
+on it from the critical view"
+send "ackinfo critold.example.com.conn
+1
+1
+bob
+was on it"
+sleep 1.2
 
 # A status with a secret in it, as a process list shows a command line.
 send "status enc2,example,com.procs green up
@@ -125,6 +141,10 @@ enc=$(api_get '/status?entity=enc.example.com&test=conn')
 assert_contains '"text":"C:\\temp | cpu\tload \\n not a newline"' "$enc" "a pipe, a tab, a backslash and a literal \\n are decoded as xymondboard encoded them"
 assert_contains '"text":"up for 5h"' "$(api_get '/status?entity=lt.example.com&test=conn')" "the command line is left out when it has a lifetime with a unit and a group"
 assert_not_contains '"acknowledged"' "$(api_get '/status?entity=red.example.com&test=conn')" "an acknowledgement that ran out is not reported, though xymond still carries it"
+crit=$(api_get '/status?entity=crit.example.com&test=conn')
+assert_contains '"acknowledged":{' "$crit" "an acknowledgement from the critical-systems view, in acklist alone, says so"
+assert_contains 'on it from the critical view' "$crit" "with its words"
+assert_not_contains '"acknowledged"' "$(api_get '/status?entity=critold.example.com&test=conn')" "one in acklist that ran out is not reported"
 assert_equal "400" "$(api_code '/status?entity=../etc&test=disk')" "/status with a host name that is a path"
 
 hid=$(api_get '/status?entity=enc2.example.com&test=procs')
