@@ -257,8 +257,18 @@ to that path, to whoever sits there. A group the admin trusts with that
 path, writing a directory on it, is named in
 \fBXYMONAPI_RELAY_TRUSTED_GROUPS\fR, names or numbers -- the log names the
 group that may write the directory refused: on a Homebrew install, admin,
-which may write /opt/homebrew's directories by design. No group is trusted for its name
-or number alone. Under SELinux the web server must be allowed to connect
+which may write /opt/homebrew's directories by design. On Ubuntu, /var/log
+is root:syslog 0775, and a Xymon built with the runtime directory left to
+its default, the log directory -- configure's default answer, and Xymon's
+own debian/rules -- has the relay refused for group syslog, which rsyslog runs
+as. Rather than trust it, give Xymon a runtime directory under a safe
+parent: make /var/lib/xymon/run, say, owned by the Xymon user, mode 755,
+and set XYMONRUNDIR="/var/lib/xymon/run" in a file of
+$XYMONHOME/etc/xymonserver.d/ -- Xymon reads it at run time, so no
+rebuild -- then restart Xymon and install the plugin again, which writes
+the new path into the snippets; or /run/xymon, made again at each boot by
+a line "d /run/xymon 0755 xymon xymon -" in /etc/tmpfiles.d/xymon.conf,
+as Xymon's RPM does. No group is trusted for its name or number alone. Under SELinux the web server must be allowed to connect
 to the socket. Neither door reads
 X-Forwarded headers, and no path redirects to another: a trailing slash is
 not_found.
