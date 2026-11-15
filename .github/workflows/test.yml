@@ -1,8 +1,10 @@
 name: test
 
-# The tests run against Xymon's main branch, built here: the API reads what a
-# real xymond answers, so that is what it is tested with. The weekly run
-# catches a change in Xymon that breaks the API when nothing here changed.
+# The tests run against Xymon built here -- its main branch, and its latest
+# release, 4.3.31, the oldest the plugins accept: the API reads what a real
+# xymond answers, so that is what it is tested with, and a release has no
+# XYMONRUNDIR, which main has. The weekly run catches a change in Xymon that
+# breaks the API when nothing here changed.
 #
 # A push runs them on the integration branches alone -- main, and dev on a
 # fork that has one -- and a pull request runs them on its head: a branch
@@ -22,17 +24,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        xymon: [main, rel-4.3.31]
     steps:
       - name: Checkout xymon-plugins
         uses: actions/checkout@v7
         with:
           path: plugins-repo
 
-      - name: Checkout Xymon (main)
+      - name: Checkout Xymon (${{ matrix.xymon }})
         uses: actions/checkout@v7
         with:
           repository: xymon-monitoring/xymon
-          ref: main
+          ref: ${{ matrix.xymon }}
           path: xymon
 
       - name: Install dependencies
