@@ -44,6 +44,9 @@ to come.
 - **What the administrator wants to keep lives outside.** Data that should
   outlive the plugin -- the API's tokens, a search index -- is kept outside
   its directory, and does nothing once the plugin is gone.
+- **What a plugin makes while it runs lies where Xymon keeps its own.** A socket
+  is in Xymon's runtime directory, its own directory there, made when it
+  starts and taken away when it stops; a log, in Xymon's log directory.
 - **One command, nothing particular to a plugin.** The command reads each
   plugin's `PLUGIN` file and holds no plugin's name; a new plugin is a
   directory and its `PLUGIN` file.
@@ -208,6 +211,17 @@ the stage's `plugins/` is removed, never followed, and a command is
 written in place of a link, never through it. No virtualenv is made or
 used under `DESTDIR`: it belongs to the installed system.
 
+**S22. A socket a plugin makes for another program is in Xymon's runtime
+directory.**
+The API's relay socket for the web server is
+`$XYMONRUNDIR/xymonapi/relay.sock`, or under `$XYMONSERVERLOGS` when
+`XYMONRUNDIR` is empty, as Xymon does. The install writes that path into
+the web server snippets, read from the server's `xymonserver.cfg`, the last
+`XYMONRUNDIR=` line, quoted or not; where it is no absolute path written
+out -- one that names a variable -- the snippets keep `@XYMONRUNDIR@` and
+the install says so. The API makes its directory there when it starts and
+takes it away when it stops.
+
 ### Knowing what is installed
 
 **S15. `status` says what is installed.**
@@ -238,6 +252,12 @@ against Python, which every plugin needs.
 
 Rules decided but not yet tested; each is numbered in the pull request that
 brings its test.
+
+- **The API's own socket in Xymon's runtime directory too.** The socket for
+  the server's own programs, `$XYMONVAR/xymonapi/api.sock`, moves under
+  `$XYMONRUNDIR/xymonapi/`, where the relay is, in a directory of its own
+  that only the Xymon user and its group may enter; the clients look there
+  first, then at the old path, for a version.
 
 - **One command, read as a sentence.** `xymon-plugin`, at the top of the
   repository, replaces `install.sh`, and takes a verb and the plugins it

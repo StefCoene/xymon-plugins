@@ -46,7 +46,7 @@ find_root() {
 server_tree() {
 	mkdir -p "$1/bin" "$1/etc"
 	: > "$1/bin/xymond"
-	echo "optional directory $1/etc/xymonserver.d" > "$1/etc/xymonserver.cfg"
+	printf 'XYMONRUNDIR="%s/run"\noptional directory %s/etc/xymonserver.d\n' "$1" "$1" > "$1/etc/xymonserver.cfg"
 }
 
 API_PORT=""
@@ -75,9 +75,11 @@ start_api() {
 		API_PORT=$(free_port) || fail "no free port for the API"
 		# The index /search reads: the test's own, never the one in this
 		# user's cache, which a developer's machine may well have.
-		# No relay socket unless a test asks for one.
-		XYMONAPI_LISTEN="127.0.0.1:$API_PORT" XYMONAPI_RELAY_SOCKET="${XYMONAPI_RELAY_SOCKET:-}" XYMONAPI_RAG_INDEX="${XYMONAPI_RAG_INDEX:-$work/no-index.npz}" \
-			"${API_ROOT:-$ROOT/plugins/xymonapi}/xymonapi.sh" > "$work/api.log" 2>&1 &
+		# No relay socket unless a test asks for one, or for the launcher's
+		# own, with API_RELAY_DEFAULT.
+		( [ -n "${API_RELAY_DEFAULT:-}" ] || export XYMONAPI_RELAY_SOCKET="${XYMONAPI_RELAY_SOCKET:-}"
+		  XYMONAPI_LISTEN="127.0.0.1:$API_PORT" XYMONAPI_RAG_INDEX="${XYMONAPI_RAG_INDEX:-$work/no-index.npz}" \
+			exec "${API_ROOT:-$ROOT/plugins/xymonapi}/xymonapi.sh" ) > "$work/api.log" 2>&1 &
 		API_PID=$!
 		deadline=$(( $(date +%s) + 60 ))
 		while [ "$(date +%s)" -lt "$deadline" ]; do

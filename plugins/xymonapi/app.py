@@ -688,7 +688,7 @@ def main(argv: list[str]) -> int:
             with contextlib.suppress(OSError):
                 os.unlink(path)
         # And the relay's directory, the API's own, once empty: removing the
-        # plugin leaves nothing behind it in $XYMONHOME/tmp.
+        # plugin leaves nothing behind it in Xymon's runtime directory.
         for path in bound:
             with contextlib.suppress(OSError):
                 os.rmdir(os.path.dirname(path))
