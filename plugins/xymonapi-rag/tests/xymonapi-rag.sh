@@ -83,13 +83,22 @@ assert_contains '"search":null' "$(api_get /health)" "/health reports no index"
 # file below starts from: index keeps the vectors it knows and embeds only
 # the changes, which is what those blocks are about. Embedded afresh for
 # each of them, the same pages cost a minute apiece on a CI runner.
+# Where CI keeps the index of every Xymon page (XYMONAPI_RAG_EVAL_INDEX,
+# xymonapi-rag-eval.sh), the seed starts from it: these pages' passages
+# keep their vectors, the others drop out, and only this test's own pages
+# are embedded.
+[ -s "${XYMONAPI_RAG_EVAL_INDEX:-}" ] && cp "$XYMONAPI_RAG_EVAL_INDEX" "$work/seed.npz"
 rc=0
 XYMONAPI_RAG_INDEX="$work/seed.npz" rag index --no-history > "$work/index.out" || rc=$?
 [ "$rc" -eq 77 ] && skip "$(cat "$work/rag.err")"
 [ "$rc" -eq 0 ] || fail "xymonapi-rag index exited with $rc: $(tail -n 5 "$work/rag.err")"
 assert_match "indexed [0-9]+ passages \([0-9]+ new\)" "$(cat "$work/index.out")" "index says what it did"
 first=$(sed -E 's/indexed ([0-9]+) passages \(([0-9]+) new\).*/\1 \2/' "$work/index.out")
-assert_equal "${first% *}" "${first#* }" "the first indexing embeds every passage"
+if [ -s "${XYMONAPI_RAG_EVAL_INDEX:-}" ]; then
+	[ "${first#* }" -lt "${first% *}" ] || fail "seeded from the index of every page, the first indexing embedded all ${first% *} passages"
+else
+	assert_equal "${first% *}" "${first#* }" "the first indexing embeds every passage"
+fi
 cp "$work/seed.npz" "$work/index.npz"
 rag index > "$work/index.out" || fail "indexing the history over the seed failed: $(tail -n 5 "$work/rag.err")"
 assert_contains "(2 new)" "$(cat "$work/index.out")" "over the seed, only the two changes are new"
