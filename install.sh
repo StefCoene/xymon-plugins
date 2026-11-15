@@ -29,7 +29,7 @@
 # disable-server removes. Running an install again updates: each plugin's
 # directory is replaced as a whole, and the admin's task files, whether each
 # is on, web server snippets and data are kept. Settings come from the environment, or as
-# NAME=value arguments: XYMONHOME, PREFIX, MANDIR (/usr/share/man), DESTDIR,
+# NAME=value arguments: XYMONHOME, PREFIX, MANDIR (/usr/share/man; Homebrew's share/man for a Xymon it installed), DESTDIR,
 # which stages either side for a package, and PYTHON, the Python a
 # virtualenv is made with.
 #
@@ -66,7 +66,16 @@ done
 
 XYMONHOME=${XYMONHOME:-}
 DESTDIR=${DESTDIR:-}
-MANDIR=${MANDIR:-/usr/share/man}
+# MANDIR, /usr/share/man by default, which macOS lets no one write: for a
+# Xymon that Homebrew installed, XYMONHOME under its prefix, Homebrew's
+# share/man, where man looks.
+if [ -z "${MANDIR:-}" ]; then
+	MANDIR=/usr/share/man
+	bp=$(brew --prefix 2>/dev/null) || bp=
+	if [ -n "$bp" ]; then
+		case $XYMONHOME in "$bp"/*) MANDIR=$bp/share/man ;; esac
+	fi
+fi
 PREFIX=${PREFIX:-$HOME/.local}
 # PYTHON given is also the one an install makes the virtualenv from, in
 # place of its search for one.
