@@ -153,7 +153,7 @@ def entities() -> list[dict]:
 
 
 _STATUS_FIELDS = ["hostname", "testname", "color", "lastchange", "logtime",
-                  "acktime", "disabletime", "ackmsg", "dismsg", "msg"]
+                  "acktime", "disabletime", "ackmsg", "dismsg", "acklist", "msg"]
 _STATUS_MAX = 1024 * 1024
 
 # XYMONAPI_HIDE names a file of regular expressions, one per line; what they
@@ -235,8 +235,21 @@ def status(entity: str | None, test: str | None) -> dict:
     # xymond clears an acknowledgement that ran out only when the next status
     # arrives; until then the board still carries it, and its XML output
     # too reports it only while acktime is ahead of now.
+    # Two ways to acknowledge: xymondack sets acktime and ackmsg; the
+    # critical-systems view's ackinfo adds to acklist, one
+    # "start:until:level:by:text" line each, acktime left at 0. Xymon's
+    # pages show either (xymongen/loaddata.c); the one running longest is
+    # given.
+    acks = []
     if _DIGITS.fullmatch(d["acktime"]) and int(d["acktime"]) > now:
-        out["acknowledged"] = {"until": _iso(d["acktime"]), "text": hide(_nldecode(d["ackmsg"]))}
+        acks.append((int(d["acktime"]), _nldecode(d["ackmsg"])))
+    for line in _nldecode(d["acklist"]).splitlines():
+        a = line.split(":", 4)
+        if len(a) == 5 and _DIGITS.fullmatch(a[1]) and int(a[1]) > now:
+            acks.append((int(a[1]), a[4]))
+    if acks:
+        until, words = max(acks)
+        out["acknowledged"] = {"until": _iso(str(until)), "text": hide(words)}
     # Disabled by hand, with an end time or -1 for "until it is ok again"; or
     # blue from a DOWNTIME tag in hosts.cfg, with no end time and the words
     # "Planned downtime".
