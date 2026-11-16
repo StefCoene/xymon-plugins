@@ -381,7 +381,7 @@ brings its test.
   run says, before it changes anything, the target, the parts, and what
   chose them: named, or detected and confirmed. As decided in #39, no record of the target is written
   in an installed part, which keeps only its `PLUGIN` and `VERSION`; the
-  one used last is remembered apart (open, below).
+  one used last is remembered apart (below).
 - **With no verb on a terminal, the command shows where things stand, then
   offers what applies.** Run with no verb, its input and its output on a
   terminal, it first says what it found: the Xymon installation, by the
@@ -407,12 +407,37 @@ brings its test.
   reports to, whose URL is asked the first time, as `XYMONSERVERS` gives
   an address and no URL. A source named with `--source` is trusted: what it
   gives is installed unchecked, and the first line says so.
-- **Open, to decide.** What a source not named does with code no proof
-  checks -- configurable, its defaults to choose -- and how a compromised
-  Xymon server is warned of or blocked: a contradiction with GitHub's
-  release, a memory of the code installed, a published block list, an
-  emergency stop -- urgent, as no plugin has a release on GitHub yet.
-  Also:
+- **Code no proof checks follows a setting, `trust`.** From a source not
+  named, code that matches no release on GitHub -- every plugin's today,
+  as none has a release yet -- is handled as `trust` says:
+
+  | `trust` | code no proof checks |
+  |---|---|
+  | `github-only` | refused, unless `--force` |
+  | `ask` | asked, `[y/N]`, on a terminal; refused off one |
+  | `connected-server-warn` | from the connected server -- its certificate checked, its token -- installed, with a warning |
+  | `connected-server` | from the connected server, installed, with no warning |
+
+  It is `ask` for a Xymon server's and a client's parts, and
+  `connected-server-warn` for the person's tools, until set otherwise.
+  Four guards stand against a compromised Xymon server, each on until the
+  setting turns it off: code that differs from the GitHub release of the
+  same version is refused; so is code that differs from what was
+  installed before under the same version, whose digest is kept; a block
+  list the project publishes refuses the versions it names, and `status`
+  says when one is installed; and a command stops a server serving
+  plugins, or sets a machine to `github-only`. Where GitHub cannot be
+  reached, the first and the third are not checked, and `trust` decides,
+  as for code no proof checks. The setting and the digests are kept in
+  `~/.config/xymon-plugin/` for the person's tools, and in
+  `$XYMONHOME/etc/xymon-plugin.cfg` for a Xymon tree's parts. The
+  installation used last, which the dialogue proposes among several, is
+  kept for the person who typed the command -- `SUDO_USER` under `sudo`,
+  else the account that runs it; when it is gone, there is no default, and
+  the command says so.
+- **Open, to decide.**
+  - what `connected-server-warn` and `connected-server` do with code from
+    a source other than the connected server;
   - the `connect:` line's details: its value, two plugins declaring it,
     tools already installed, a failure; `connect` run as root; which
     selectors `connect` takes;
@@ -434,8 +459,6 @@ brings its test.
   - whether a server installed from a checkout serves an archive at all;
   - the current directory reached through a link, as Homebrew's `ext/`;
   - finding the server a client tree belongs to when detection does not;
-  - where "the one used last" is kept, per machine or per person, and
-    what is proposed when it is gone;
   - on a terminal, with several installations, whether `status` asks for
     one or lists them all;
   - how a script makes the Python environment, as there is no verb for it
@@ -474,7 +497,7 @@ brings its test.
   no access to GitHub. A server installed from a checkout that is not a
   release tag -- `stable`, `main` -- has no attested archive, and
   `/plugins/NAME` says so. What an install does with an archive a proof
-  contradicts, or none can prove, is open (above).
+  contradicts, or none can prove, is `trust`'s and the guards' (above).
 
 ## Later
 
