@@ -103,7 +103,7 @@ Then turn it on, `XYMONHOME=/usr/lib/xymon/server ./install.sh enable-server xym
 
 ```sh
 curl http://127.0.0.1:1986/xymon/api/v1/health              # the port: 401 means it runs and asks for a user
-curl --unix-socket "$XYMONRUNDIR/xymonapi/local/api.sock" http://localhost/xymon/api/v1/health
+curl --unix-socket /run/xymon/xymonapi/local/api.sock http://localhost/xymon/api/v1/health   # the path the install printed
 ```
 
 The port asks for one of its [users](#users), `-u alice`, whatever the

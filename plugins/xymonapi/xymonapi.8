@@ -1,4 +1,4 @@
-.TH XYMONAPI 8 "November 15, 2026" "xymon-plugins"
+.TH XYMONAPI 8 "November 16, 2026" "xymon-plugins"
 .SH NAME
 xymonapi \- read-only HTTP and JSON interface to the Xymon server
 .SH SYNOPSIS
@@ -409,7 +409,8 @@ From other machines, use HTTPS: with xymond's certificate the API speaks it
 itself (XYMONAPI_TLS_CERT), and where the web server has a certificate the
 snippets under FILES pass /xymon/api/ to the API's relay socket over it.
 An SSH tunnel to the relay socket is encrypted too, with nothing to set up:
-ssh -L 1986:$XYMONRUNDIR/xymonapi/relay.sock HOST. A client is given
+ssh -L 1986:/run/xymon/xymonapi/relay.sock HOST, where Xymon's runtime
+directory (XYMONRUNDIR) is /run/xymon: install-server prints the path. A client is given
 the URL that reaches the API, scheme, host and port, without /xymon/api/v1,
 which it adds: https://HOST:1986 for the API's own HTTPS; the web server's,
 https://HOST, or https://HOST:PORT when its HTTPS port is not 443, for the

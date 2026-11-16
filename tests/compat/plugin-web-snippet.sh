@@ -50,6 +50,7 @@ assert_contains "$home/run/xymonapi/relay.sock" "$(cat "$home/ext/xymonapi/xymon
 	"[S22] the snippet names the relay socket in XYMONRUNDIR, from xymonserver.cfg"
 assert_contains "IncludeOptional" "$(cat "$work/first.log")" "[S16] the install says to include it with IncludeOptional"
 assert_contains "reload the web server" "$(cat "$work/first.log")" "[S16] a first install says to reload the web server"
+assert_contains "register unix:$home/run/xymonapi/local/api.sock" "$(cat "$work/first.log")" "[S22] the install prints the API's socket, Xymon's runtime directory read"
 
 echo "# the admin's port" >> "$home/ext/xymonapi/xymonapi-nginx.conf"
 cp "$home/ext/xymonapi/xymonapi-nginx.conf" "$work/edited"

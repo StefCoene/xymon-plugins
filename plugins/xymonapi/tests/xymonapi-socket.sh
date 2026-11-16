@@ -57,7 +57,7 @@ assert_contains "not through the socket" "$(curl -s --unix-socket "$sock" "http:
 assert_equal "401" "$(curl -s --unix-socket "$sock" -o /dev/null -w '%{http_code}' -X POST -d '{"client":"here"}' -H 'Content-Type: application/json' "http://localhost/xymon/api/v1/tokens")" "a new token neither"
 
 # The client over the socket: xymonapi-connect, with no terminal and nothing
-# on stdin, asks nothing, keeps nothing, and prints the URL alone -- not a
+# on stdin, asks nothing, keeps the URL alone, and prints the URL alone -- not a
 # token or a certificate this machine keeps for the same API by URL, which
 # have no part over the socket.
 mkdir -p "$work/cfg/xymon-api"
@@ -69,6 +69,7 @@ assert_equal "0" "$rc" "xymonapi-connect over the socket: connected ($(cat "$wor
 assert_equal "XYMONAPI_URL=unix:$sock" "$(cat "$work/connect.out")" "its settings: the URL alone, not the token file or the CA kept here"
 assert_contains "asks no credential" "$(cat "$work/connect.err")" "and it says why there is no token"
 assert_equal "xat_notthisone" "$(cat "$work/cfg/xymon-api/xymon.token")" "the token kept for the URL is left as it is"
+assert_equal "unix:$sock" "$(cat "$work/cfg/xymon-api/xymon.url")" "it keeps the socket's URL, for a client given none"
 
 # The MCP server reads the API through it.
 mcp "unix:$sock" '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"health","arguments":{}}}' \

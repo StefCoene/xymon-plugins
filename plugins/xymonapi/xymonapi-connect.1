@@ -1,4 +1,4 @@
-.TH XYMONAPI-CONNECT 1 "November 2, 2026" "xymon-plugins"
+.TH XYMONAPI-CONNECT 1 "November 16, 2026" "xymon-plugins"
 .SH NAME
 xymonapi-connect \- connect this machine to the Xymon API
 .SH SYNOPSIS
@@ -29,12 +29,16 @@ says when the API and this client run different versions of xymonapi, and
 who can act on it: the server's admin when the API is the older, this
 machine when the client is;
 .IP 5. 4
+keeps the URL in ~/.config/xymon-api/NAME.url, which a client given no
+XYMONAPI_URL reads for the name xymon, with the token and certificate
+beside it;
+.IP 6. 4
 prints on stdout what a client needs, as shell settings: XYMONAPI_URL,
 XYMONAPI_TOKEN_FILE when there is a token, and XYMONAPI_CA when a
 certificate is used.
 .PP
 Given the API's own socket, unix:PATH, on the server, it asks nothing and
-keeps nothing: the socket's permissions decided already who connects, and
+keeps no credential, the URL alone: the socket's permissions decided already who connects, and
 the settings printed name the socket alone.
 .PP
 Running it again changes nothing while the token works, and replaces one

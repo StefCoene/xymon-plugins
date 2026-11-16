@@ -76,6 +76,11 @@ assert_not_contains "$hard" "$(cat "$tok")" "the token is not the password"
 assert_contains "XYMONAPI_URL=$url" "$(cat "$work/out")" "it prints the API's address"
 assert_contains "XYMONAPI_TOKEN_FILE=$tok" "$(cat "$work/out")" "and the token file"
 assert_not_contains "XYMONAPI_CA" "$(cat "$work/out")" "and no certificate, over http"
+assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "it keeps the URL beside the token"
+# A client given no setting reads the URL kept, and sends the token beside it.
+assert_contains '"states"' "$(XDG_CONFIG_HOME="$cfg" HOME="$work" env -u XYMONAPI_URL -u XYMONAPI_TOKEN_FILE -u XYMONAPI_TOKEN -u XYMONAPI_CA -u XYMONAPI_SOCKET -u XYMONRUNDIR -u XYMONSERVERLOGS \
+	"${XYMONAPI_PYTHON:-python3}" -c 'import sys, json; sys.path.insert(0, sys.argv[1]); import xymonapi_client as c; print(json.dumps({"states": c.api("/states")}))' \
+	"$work/client/libexec/xymon-plugins/xymonapi" 2>&1)" "a client with no XYMONAPI_URL reaches the API connected to, with its token"
 assert_not_contains "differ" "$(cat "$work/err")" "the same version on both sides is not remarked on"
 assert_not_contains "runs xymonapi" "$(cat "$work/err")" "nor said at all"
 h=$(hostname)
@@ -94,6 +99,14 @@ printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
 [ "$rc" -eq 0 ] || fail "a run after revoking failed with $rc: $(cat "$work/err")"
 [ "$first" != "$(cat "$tok")" ] || fail "a revoked token was kept"
 assert_match '^xat_' "$(cat "$tok")" "a revoked token is replaced"
+
+# Kept for another server under the same name: the token is not sent here,
+# though it would work; the password is asked, and the URL kept is this one.
+echo "http://another.example:1986" > "$cfg/xymon-api/xymon.url"
+printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
+[ "$rc" -eq 0 ] || fail "a run after another server's failed with $rc: $(cat "$work/err")"
+assert_contains "password for" "$(cat "$work/err")" "a token kept for another URL is not sent: the password is asked"
+assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "and the URL kept is this one"
 
 # A wrong password: said, and nothing written.
 curl -s -o /dev/null -u "carol:$hard" -X DELETE "$url/xymon/api/v1/tokens/${h%%.*}"

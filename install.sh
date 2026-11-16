@@ -153,8 +153,13 @@ sedesc() { printf '%s\n' "$1" | sed -e 's/[\\&|]/\\&/g'; }
 # with the paths of the installed system, never the stage's under DESTDIR:
 # the message is for whoever runs that system.
 say() {
-	field "$1" "$2" | sed -e "s|@ETC@|$(sedesc "$XYMONHOME/etc")|g" -e "s|@TASKDIR@|$(sedesc "$XYMONHOME/etc/tasks.d")|g" \
-		-e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g"
+	t=$(field "$1" "$2")
+	# Xymon's runtime directory, read only for a message that names it; one
+	# the install cannot read stays a name the admin knows.
+	r=
+	case $t in *@XYMONRUNDIR@*) r=${RUNDIR:-$(rundir)} || exit 1 ;; esac
+	[ -z "$t" ] || printf '%s\n' "$t" | sed -e "s|@ETC@|$(sedesc "$XYMONHOME/etc")|g" -e "s|@TASKDIR@|$(sedesc "$XYMONHOME/etc/tasks.d")|g" \
+		-e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g" -e "s|@XYMONRUNDIR@|$(sedesc "${r:-\$XYMONRUNDIR}")|g"
 }
 
 # Every plugin, by the directories under plugins/ that hold a PLUGIN file.
@@ -933,6 +938,8 @@ install_tools() {
 	fi
 	manual "$1" "$(field "$1" tools-manual)" "$dir" "$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1"
 	venv_auto "$1" "$TOOLSROOT" "$(field "$1" tools-modules)" venv-tools "$(field "$1" venv-note)"
+	echo "Installed $1 $(sed -e 's|^.*/v||' "$dir/VERSION") in $PREFIX/libexec/xymon-plugins/$1."
+	say "$1" installed-tools
 	DONE="$DONE $1"
 }
 
