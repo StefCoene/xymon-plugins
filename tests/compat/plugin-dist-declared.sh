@@ -104,11 +104,11 @@ assert_contains "no file of its own directory" "$(cat "$work/esc.log")" "[S19] a
 [ -z "$(find "$work/server2" -name outside.key)" ] || fail "[S19] a file outside the plugin was copied"
 
 cp -R "$repo" "$work/repo4"
-sed -e 's|^needs: .*|needs: ../victim|' "$repo/plugins/xymonapi-mcp/PLUGIN" > "$work/repo4/plugins/xymonapi-mcp/PLUGIN"
+sed -e 's|^server-needs: .*|server-needs: ../victim|' "$repo/plugins/xymonapi-mcp/PLUGIN" > "$work/repo4/plugins/xymonapi-mcp/PLUGIN"
 server_tree "$work/server4"
 rc=0
 "$work/repo4/install.sh" install-server xymonapi-mcp XYMONHOME="$work/server4" MANDIR="$work/man" </dev/null >"$work/needs.log" 2>&1 || rc=$?
-[ "$rc" -ne 0 ] || fail "[S19] an install whose needs: names ../ succeeded"
+[ "$rc" -ne 0 ] || fail "[S19] an install whose server-needs: names ../ succeeded"
 assert_contains "not a plugin name" "$(cat "$work/needs.log")" "[S19] and says why"
 
 cp -R "$repo" "$work/repo3"
