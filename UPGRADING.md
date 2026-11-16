@@ -11,7 +11,8 @@ that breaks the API's contract without a line here.
 `~/.config/xymon-api/NAME.url`, and sends a token only to that URL. What
 breaks: on a machine connected before, the first `xymonapi-connect URL`, or
 `xymonapi-mcp register URL`, asks your password again, once, and keeps a new
-token; the one before stays valid on the server until `/tokens` revokes it.
+token, which replaces the one before on that server; a token kept for
+another server stays valid there until its `/tokens` revokes it.
 The same server reached by another URL asks it too. Then the agent and
 `xymonapi-rag` find the API with no `XYMONAPI_URL` set.
 

@@ -159,8 +159,10 @@ say() {
 	# would take for set.
 	r=
 	case $t in *@XYMONRUNDIR@*) r=${RUNDIR:-$(rundir)} || exit 1 ;; esac
-	[ -n "$r" ] || r="<the runtime directory of Xymon>"
-	[ -z "$t" ] || printf '%s\n' "$t" | sed -e "s|@ETC@|$(sedesc "$XYMONHOME/etc")|g" -e "s|@TASKDIR@|$(sedesc "$XYMONHOME/etc/tasks.d")|g" \
+	# One the install cannot read: the lines naming it are left out --
+	# conf says to put the directory in the snippets -- rather than give a
+	# command that cannot be typed as it is.
+	[ -z "$t" ] || printf '%s\n' "$t" | { if [ -z "$r" ]; then sed '/@XYMONRUNDIR@/d'; else cat; fi; } | sed -e "s|@ETC@|$(sedesc "$XYMONHOME/etc")|g" -e "s|@TASKDIR@|$(sedesc "$XYMONHOME/etc/tasks.d")|g" \
 		-e "s|@XYMONHOME@|$(sedesc "$XYMONHOME")|g" -e "s|@XYMONRUNDIR@|$(sedesc "$r")|g"
 }
 
@@ -941,8 +943,9 @@ install_tools() {
 	manual "$1" "$(field "$1" tools-manual)" "$dir" "$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1"
 	venv_auto "$1" "$TOOLSROOT" "$(field "$1" tools-modules)" venv-tools "$(field "$1" venv-note)"
 	echo "Installed $1 $(sed -e 's|^.*/v||' "$dir/VERSION") in $PREFIX/libexec/xymon-plugins/$1."
-	if [ -n "$(field "$1" command)" ]; then
-		case ":$PATH:" in *":$PREFIX/bin:"*) ;; *) echo "Its command is in $PREFIX/bin, which is not on PATH: add it." ;; esac
+	# Said once, and not under DESTDIR, where PATH is the build machine's.
+	if [ -n "$(field "$1" command)" ] && [ -z "$DESTDIR" ] && [ -z "${PATHSAID:-}" ]; then
+		case ":$PATH:" in *":$PREFIX/bin:"*) ;; *) echo "The commands are in $PREFIX/bin, which is not on PATH: add it."; PATHSAID=1 ;; esac
 	fi
 	say "$1" installed-tools
 	DONE="$DONE $1"

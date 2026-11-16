@@ -320,6 +320,14 @@ def _new_token(name: str) -> str:
     return token
 
 
+def _keep_url(conf: Path, name: str) -> None:
+    """Keep URL as NAME's, replacing the file whole. Not a credential."""
+    conf.mkdir(parents=True, exist_ok=True)
+    tmp = conf / f".{name}.url.{os.getpid()}"
+    tmp.write_text(URL + "\n", encoding="utf-8")
+    os.replace(tmp, conf / f"{name}.url")
+
+
 def connect(argv: list[str]) -> int:
     global URL, CA, TOKEN, TOKEN_FILE, _opener
     if not argv or argv[0] in ("-h", "--help") or len(argv) > 2:
@@ -363,6 +371,9 @@ def connect(argv: list[str]) -> int:
             with os.fdopen(fd, "w") as f:
                 f.write(token + "\n")
             os.chmod(token_file, 0o600)
+            # The URL with it at once: a run that fails after this leaves
+            # the token beside the URL that issued it, not the one before.
+            _keep_url(conf, name)
             TOKEN_FILE = str(token_file)
             _say(f"a token for {_machine()} kept in {token_file} (mode 600); the API's /tokens lists and revokes it")
             health = api("/health")
@@ -376,7 +387,8 @@ def connect(argv: list[str]) -> int:
     # stays for it.
     if not TOKEN_FILE and not local and token_file.exists() and was != URL:
         token_file.unlink()
-        _say(f"removed {token_file}, the token kept for {was or 'another URL'}: the API's /tokens there revokes it")
+        origin = was if was and urlsplit(was).scheme != "unix" else "another URL"
+        _say(f"removed {token_file}, the token kept for {origin}: the API's /tokens there revokes it")
     if not TOKEN_FILE:
         _say(f"{URL} asks no credential: the socket's permissions, or the API's settings, let this "
              "user in; no credential is kept here" if urlsplit(URL).scheme == "unix" else
@@ -397,10 +409,7 @@ def connect(argv: list[str]) -> int:
              "with git pull && ./install.sh install-tools")
     # The URL kept beside the token: a client given no XYMONAPI_URL reads
     # the default name's. Not a credential.
-    conf.mkdir(parents=True, exist_ok=True)
-    tmp = conf / f".{name}.url.{os.getpid()}"
-    tmp.write_text(URL + "\n", encoding="utf-8")
-    os.replace(tmp, conf / f"{name}.url")
+    _keep_url(conf, name)
     settings = {"XYMONAPI_URL": URL}
     if TOKEN_FILE:
         settings["XYMONAPI_TOKEN_FILE"] = TOKEN_FILE
