@@ -659,26 +659,45 @@ conf() {
 		*[!A-Za-z0-9._/+-]*) echo "The web server snippets in $EXTROOT/$1 name $XYMONHOME${RUNDIR:+ and $RUNDIR}, which hold characters a web server's configuration may not take as they are: check the path in the snippet you include." ;;
 	esac
 	[ -n "$RUNDIR" ] || echo "The web server snippets in $EXTROOT/$1 name @XYMONRUNDIR@: $XYMONHOME/etc/xymonserver.cfg gives XYMONRUNDIR, or XYMONSERVERLOGS, as no path the install can read; put Xymon's runtime directory in its place in the snippet you include."
+	# Each snippet as written is kept in .shipped/, beside it in the
+	# plugin's directory, where no include pattern reaches it: the next
+	# install takes a snippet still byte for byte that one for unedited,
+	# whatever it names -- a runtime directory moved since, say.
+	base=$EXTROOT/$1/.shipped
+	changed=${GONE:-}
 	for c in $(field "$1" conf); do
 		dst=$EXTROOT/$1/$c
+		old=$EXTROOT/.$1.$c.shipped
+		mkdir -p "$base" || exit 1
 		if [ -f "$EXTROOT/.$1.$c" ]; then
 			mv "$EXTROOT/.$1.$c" "$dst" || exit 1
 		else
 			stock "$1" "$c" > "$dst" && chmod 644 "$dst" || exit 1
+			cp -f "$dst" "$base/$c" || exit 1
+			rm -f "$old"
+			changed=1
 			continue
 		fi
-		# A kept snippet an older version shipped, unedited, takes this
-		# version's; one that differs from it is the admin's, and kept,
-		# said to be.
+		# A kept snippet as an earlier install wrote it, or as an older
+		# version shipped it, unedited, takes this version's; one that
+		# differs from both is the admin's, and kept, said to be.
 		if same "$1" "$c" "$dst"; then
-			:
-		elif shipped "$1" "$c" "$dst"; then
+			cp -f "$dst" "$base/$c" || exit 1
+		elif { [ -f "$old" ] && cmp -s "$old" "$dst"; } || shipped "$1" "$c" "$dst"; then
 			stock "$1" "$c" > "$dst" && chmod 644 "$dst" || exit 1
-			echo "$dst, an older version's as shipped, is replaced by this version's"
+			cp -f "$dst" "$base/$c" || exit 1
+			echo "$dst, unedited, is replaced by this version's"
+			changed=1
 		else
+			if [ -f "$old" ]; then mv "$old" "$base/$c" || exit 1; fi
 			echo "$dst is kept as edited; this version's differs: compare it with $ROOT/plugins/$1/$c, @XYMONHOME@ being $XYMONHOME${RUNDIR:+ and @XYMONRUNDIR@ $RUNDIR}"
 		fi
+		rm -f "$old"
 	done
+	# A web server reads its configuration when it starts or reloads: one
+	# that runs goes on with the snippets it read. Not reloaded from here --
+	# it is not the plugin's to run, nor to choose.
+	[ -z "$changed" ] || [ -n "$DESTDIR" ] || echo "The web server snippets in $EXTROOT/$1 changed: reload the web server that includes them (apachectl graceful, nginx -s reload, or restart lighttpd)."
 }
 
 # selinux PLUGIN -- where SELinux is active, load the plugin's SELinux
@@ -837,9 +856,27 @@ install_server() {
 	# A link where one is set aside would take it elsewhere: removed first.
 	if [ -L "$EXTROOT/.$1.tasks.cfg" ]; then rm -f "$EXTROOT/.$1.tasks.cfg" || exit 1; fi
 	if [ -f "$ext/tasks.cfg" ]; then mv "$ext/tasks.cfg" "$EXTROOT/.$1.tasks.cfg" || exit 1; fi
+	# A snippet the install before wrote that this version has no more goes
+	# with fresh: a change the web server has to reload for, as conf says.
+	GONE=
+	for c in $(held "$EXTROOT" "$1" conf); do
+		case " $(field "$1" conf) " in
+			*" $c "*) ;;
+			*) if [ -f "$ext/$c" ]; then GONE=1; fi ;;
+		esac
+	done
 	for c in $(field "$1" conf); do
 		if [ -L "$EXTROOT/.$1.$c" ]; then rm -f "$EXTROOT/.$1.$c" || exit 1; fi
-		if [ -f "$ext/$c" ]; then mv "$ext/$c" "$EXTROOT/.$1.$c" || exit 1; fi
+		# A real file only: one a link stands for is written anew, never
+		# written through, wherever it points.
+		if [ -f "$ext/$c" ] && [ ! -L "$ext/$c" ]; then mv "$ext/$c" "$EXTROOT/.$1.$c" || exit 1; fi
+		# And what the install before wrote of it, which conf compares the
+		# snippet with: a real directory and a real file only, the plugin's
+		# directory being one the Xymon user may write.
+		rm -f "$EXTROOT/.$1.$c.shipped" || exit 1
+		if [ -d "$ext/.shipped" ] && [ ! -L "$ext/.shipped" ] && [ -f "$ext/.shipped/$c" ] && [ ! -L "$ext/.shipped/$c" ]; then
+			mv "$ext/.shipped/$c" "$EXTROOT/.$1.$c.shipped" || exit 1
+		fi
 	done
 	fresh "$ext" || exit 1
 	copy "$1" server "$ext"
@@ -973,6 +1010,10 @@ uninstall_server() {
 	m=$(held "$EXTROOT" "$1" server-manual)
 	t=$(held "$EXTROOT" "$1" task)
 	se=$(held "$EXTROOT" "$1" selinux)
+	cf=
+	for c in $(held "$EXTROOT" "$1" conf); do
+		if [ -f "$EXTROOT/$1/$c" ]; then cf=1; fi
+	done
 	legacy=; [ -f "$EXTROOT/$1/PLUGIN" ] || legacy=1
 	rm -rf "$EXTROOT/$1" "$DIST/plugins/$1"
 	drop_manual "$m" "$MANDIR" "$XYMONHOME/ext/$1" "$legacy"
@@ -982,6 +1023,7 @@ uninstall_server() {
 		semodule -r "$1" >/dev/null 2>&1 || :
 	fi
 	if [ -f "$ROOT/plugins/$1/PLUGIN" ]; then say "$1" uninstalled; else echo "Uninstalled $1."; fi
+	[ -z "$cf" ] || [ -n "$DESTDIR" ] || [ -d "$EXTROOT/$1" ] || echo "Its web server snippets went with $EXTROOT/$1: reload the web server that included them (apachectl graceful, nginx -s reload, or restart lighttpd)."
 }
 
 uninstall_tools() {
