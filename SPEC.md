@@ -319,19 +319,23 @@ brings its test.
   plugin whose `PLUGIN` declares it (`connect:`), which then gets a token
   and registers the AI tools found, so that the command still names no
   plugin. It is POSIX `sh` and needs no `make`.
-- **The parts follow the installation, unless named.** By default the
-  installation a run targets (below) says which parts go in: a server's
-  tree takes the plugin's server part, and its client part into the
-  server's own client tree; a standalone client's tree, its client part.
-  The tools part is never installed with them: it belongs to the person,
-  under `PREFIX`, while the others belong to whoever owns the Xymon tree,
-  often root, and is installed
-  only when asked -- `--tools`, `connect`, or the dialogue. `--server`,
-  `--client` and `--tools` name the parts instead. A part the plugin does
-  not have, a part asked of a tree of the other kind, and `--tools` run as
-  root are refused before anything changes, saying why. A machine with no
-  Xymon installation installs no Xymon part, and says that the tools are
-  installed with `--tools` or `connect`.
+- **The parts are asked for, or named.** `--server`, `--client` and
+  `--tools` name the parts a verb acts on, for every verb. `--server` and
+  `--client` may be given together; `--tools` is given alone. Without them,
+  on a terminal, the command asks which parts, offering those the
+  installation a run targets (below) takes and the plugin has: on a
+  server's tree, its server part, and its client part into the server's
+  own client tree; on a standalone client's tree, its client part. Off a
+  terminal, a verb on a Xymon part needs them. A part the plugin does not
+  have is skipped when not named, and refused when named, saying why. On a
+  server, `--client` means the server's own client tree; `--server` asked
+  of a standalone client's tree is refused. The tools part is never
+  installed with the Xymon parts: it belongs to the person, under
+  `PREFIX`, while they belong to whoever owns the Xymon tree, often root,
+  and it is installed only when asked -- `--tools`, `connect`, or the
+  dialogue; `--tools` run as root is refused. A refusal comes before
+  anything changes. A machine with no Xymon installation installs no Xymon
+  part, and says that the tools are installed with `--tools` or `connect`.
 - **A run acts on one Xymon installation, which `XYMONHOME` names.**
   An installation is a Xymon tree, a server's, marked by
   `etc/xymonserver.cfg` and `bin/xymond`, with its own client tree, or a
@@ -345,9 +349,10 @@ brings its test.
   proposes. Trees are compared by their resolved path -- one tree may be
   reached by several, as Homebrew's `opt/` and `Cellar/` -- and a client
   tree a found server names is part of that server, not another
-  installation. Detection gives the dialogue its default, the tree holding the current
-  directory first, else the only installation found, else none, and the
-  person confirms, Enter for yes. Off a terminal, without `XYMONHOME`, a
+  installation. On a terminal, without a name, with a verb or with none,
+  the one installation found is proposed, and the person confirms, Enter
+  for yes; several are listed, with as default the one holding the current
+  directory, else the only one running, else none. Off a terminal, without `XYMONHOME`, a
   Xymon part is refused, listing the trees found: a script's target depends
   neither on its current directory nor on what runs at that moment. Every
   run says on its first line the target, the parts, and what chose them,
@@ -366,7 +371,26 @@ brings its test.
   those answers spell, asks `Proceed? [Y/n]`, runs exactly that command and
   nothing else, and says what comes next. An install it runs enables
   nothing (S5): turning the plugin on is offered after it, as a second
-  command printed and confirmed the same way. Off a terminal, S17.
+  command printed and confirmed with `[y/N]`, so that Enter declines it.
+  Off a terminal, S17.
+- **The code comes from a source.** `install` and `update` take a
+  plugin's code from a source: a Xymon server, through its API or its web
+  server; GitHub, the plugin's releases; or one named with `--source`, a
+  checkout or a URL. With none named, the tools part takes it from the
+  Xymon server `connect` connected the machine to, and a Xymon server's
+  parts from GitHub. A source named with `--source` is trusted: what it
+  gives is installed unchecked, and the first line says so.
+- **Open, to decide.** What a source not named does with code no proof
+  checks -- configurable, its defaults to choose -- and how a compromised
+  Xymon server is warned of or blocked: a contradiction with GitHub's
+  release, a memory of the code installed, a published block list, an
+  emergency stop. Also: `remove` with no plugin named; the Python
+  environment's prompts and failures; the `connect:` line's contract;
+  `--tools` as root under `DESTDIR` or `PREFIX`; which wins when
+  `XYMONHOME` and `--xymon-home` differ; `XYMONHOME` naming a server's own
+  client tree; `status` off a terminal; how the dialogue ends; where a
+  client part keeps its runtime files; what replaces `side:`; a standalone
+  client's default source.
 - **Removing the directory by hand removes everything of that part.**
   Beyond the task (S9), what each program reads it reads through the place
   below, so that after `ext/NAME` is deleted Xymon no longer applies the
@@ -396,11 +420,10 @@ brings its test.
   `sigstore`, with no key kept, as the attestation is signed for the CI run
   that built the archive; or the same archive rebuilt from the release tag
   in a copy of the repository, from any mirror, the way for a machine with
-  no access to GitHub. It refuses an archive that a proof contradicts, and
-  one it can prove by no means unless `--force` is given. A server installed
-  from a checkout that is not a release tag -- `stable`, `main` -- has no
-  attested archive: `/plugins/NAME` says so, and an install from it needs
-  `--force`.
+  no access to GitHub. A server installed from a checkout that is not a
+  release tag -- `stable`, `main` -- has no attested archive, and
+  `/plugins/NAME` says so. What an install does with an archive a proof
+  contradicts, or none can prove, is open (above).
 
 ## Later
 
