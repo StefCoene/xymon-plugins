@@ -50,6 +50,7 @@ assert_contains "$home/run/xymonapi/relay.sock" "$(cat "$home/ext/xymonapi/xymon
 	"[S22] the snippet names the relay socket in XYMONRUNDIR, from xymonserver.cfg"
 assert_contains "IncludeOptional" "$(cat "$work/first.log")" "[S16] the install says to include it with IncludeOptional"
 assert_contains "reload the web server" "$(cat "$work/first.log")" "[S16] a first install says to reload the web server"
+assert_contains "register unix:$home/run/xymonapi/local/api.sock" "$(cat "$work/first.log")" "[S22] the install prints the API's socket, Xymon's runtime directory read"
 
 echo "# the admin's port" >> "$home/ext/xymonapi/xymonapi-nginx.conf"
 cp "$home/ext/xymonapi/xymonapi-nginx.conf" "$work/edited"
@@ -138,6 +139,8 @@ XYMONSERVERLOGS="/var/log/xymon"    # Logs')" "[S22] with XYMONRUNDIR empty, the
 assert_contains "/run/xymon/xymonapi/relay.sock" "$(cfgcase plain 'XYMONRUNDIR=/run/xymon')" "[S22] an unquoted XYMONRUNDIR is read"
 assert_contains "@XYMONRUNDIR@/xymonapi/relay.sock" "$(cfgcase var 'XYMONRUNDIR="$XYMONVAR/run"')" "[S22] one that names a variable is left as @XYMONRUNDIR@"
 assert_contains "put Xymon's runtime directory in its place" "$(cat "$work/var.log")" "[S22] and the install says so"
+assert_not_contains "register unix:" "$(cat "$work/var.log")" "[S22] and gives no socket path, nor a command, it cannot know"
+assert_not_contains "<" "$(cat "$work/var.log")" "[S22] nor a placeholder to type"
 # Set again in xymonserver.d/, which Xymon reads after xymonserver.cfg: that
 # value wins; an editor's backup there is left out, as Xymon leaves it.
 h=$work/dropin; server_tree "$h"

@@ -33,6 +33,11 @@ fi
 # one that unsets it after this checks the default.
 export XYMONAPI_PASSWD="${XYMONAPI_PASSWD-}"
 
+# A client given no XYMONAPI_URL reads the one xymonapi-connect kept under
+# XDG_CONFIG_HOME: never the user's own here. A test that connects names its
+# own directory.
+export XDG_CONFIG_HOME=/nonexistent/xymon-plugins-tests
+
 # find_root -- this repository's top. Xymon's own takes the test's directory
 # two levels up, which is right for its tests/<dir>/ but not for a plugin's
 # tests under plugins/<name>/tests/: this file's place, tests/lib/, is the

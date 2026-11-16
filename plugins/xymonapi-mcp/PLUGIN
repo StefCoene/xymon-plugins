@@ -17,7 +17,9 @@ tools-files: server.py xymonapi-mcp.sh
 tools-manual: xymonapi-mcp.1
 command: xymonapi-mcp xymonapi-mcp.sh
 executable: xymonapi-mcp.sh
+installed-tools: Next, once: xymonapi-mcp register URL -- the API's address as this machine reaches it, or, on the Xymon
+installed-tools:   server, unix: and the API's local socket, which install-server prints (xymonapi(8), XYMONAPI_SOCKET). It runs xymonapi-connect, then registers the server with Claude Code and Codex.
 uninstalled-tools: Uninstalled xymonapi-mcp. What register did besides, to undo by hand:
 uninstalled-tools:   claude mcp remove --scope user xymon; codex mcp remove xymon
 uninstalled-tools:   revoke this machine's token: curl -X DELETE -u USER https://SERVER/xymon/api/v1/tokens/$(hostname -s)
-uninstalled-tools:   rm ~/.config/xymon-api/xymon.token
+uninstalled-tools:   rm ~/.config/xymon-api/xymon.token ~/.config/xymon-api/xymon.url

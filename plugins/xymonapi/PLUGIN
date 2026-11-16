@@ -2,7 +2,7 @@
 # it alone. One key per line, a key repeated for each line of a message;
 # ./install.sh at the repository's top installs it from the lines below.
 name: xymonapi
-version: 5.0.1
+version: 5.0.2
 side: server, client
 summary: a read-only HTTP and JSON interface to a Xymon server, as one of its xymonlaunch tasks, and its client
 requires: python >= 3.9
@@ -39,8 +39,10 @@ conf-stock: xymonapi-lighttpd.conf 1394800773 787
 restart: app.py
 selinux: xymonapi.cil
 installed: Installed. For other machines, include @XYMONHOME@/ext/xymonapi/xymonapi-{apache,nginx,lighttpd}.conf in the web server,
-installed:   so that it is skipped once gone -- IncludeOptional on Apache, a wildcard (xymonapi-nginx*.conf) on nginx and lighttpd --
+installed:   so that it is skipped once gone -- IncludeOptional on Apache, a wildcard (xymonapi-nginx*.conf, xymonapi-lighttpd*.conf) on nginx and lighttpd --
 installed:   or give the API xymond's certificate: see xymonapi(8).
+installed: On the server its socket is @XYMONRUNDIR@/xymonapi/local/api.sock: xymonapi-mcp register unix:@XYMONRUNDIR@/xymonapi/local/api.sock
+installed:   connects an AI tool here, once the tools are installed; the web server's relay socket is @XYMONRUNDIR@/xymonapi/relay.sock.
 installed: It starts only with its users' passwords: @ETC@/xymonpasswd, the web pages' own, or another file in XYMONAPI_PASSWD.
 selinux-loaded: SELinux: the module xymonapi is loaded, its boolean off. For the web server to reach the API's relay socket:
 selinux-loaded:   setsebool -P xymonapi_relay on   -- see xymonapi(8), XYMONAPI_RELAY_SOCKET.
@@ -50,4 +52,5 @@ tools-files: xymonapi_client.py xymonapi-connect.sh
 tools-manual: xymonapi-connect.1
 command: xymonapi-connect xymonapi-connect.sh
 executable: xymonapi.sh xymonapi-connect.sh
+installed-tools: Next: xymonapi-connect URL connects this machine to the API (xymonapi-mcp register runs it); the plugins beside it then read it with no setting.
 uninstalled-tools: Uninstalled xymonapi's client. Kept: the tokens in ~/.config/xymon-api/, which the API's /tokens revokes.

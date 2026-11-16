@@ -5,6 +5,17 @@ its version, what breaks, and what to do. Every other change needs nothing
 but installing the new code (see each plugin's README). CI refuses a change
 that breaks the API's contract without a line here.
 
+## xymonapi-connect asks the password once more, from xymonapi 5.0.2
+
+`xymonapi-connect` now keeps the API's URL beside the token, in
+`~/.config/xymon-api/NAME.url`, and sends a token only to that URL. What
+breaks: on a machine connected before, the first `xymonapi-connect URL`, or
+`xymonapi-mcp register URL`, asks your password again, once, and keeps a new
+token, which replaces the one before on that server; a token kept for
+another server stays valid there until its `/tokens` revokes it.
+The same server reached by another URL asks it too. Then the agent and
+`xymonapi-rag` find the API with no `XYMONAPI_URL` set.
+
 ## The relay socket moves to Xymon's runtime directory, from xymonapi 5.0.0
 
 The web server's relay socket is now `$XYMONRUNDIR/xymonapi/relay.sock`,

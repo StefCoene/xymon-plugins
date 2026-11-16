@@ -51,8 +51,11 @@ xymonapi-agent doctor                     # one question through the tools
 ```
 
 `register` is `xymonapi-mcp`'s: it connects this machine to the API with
-your password once, for a token of its own, and keeps the settings this
-command hands to the MCP server. What it also registers with Claude Code and
+your password once, for a token of its own, and keeps the API's URL beside
+the token, in `~/.config/xymon-api/`, where this command and `xymonapi-rag`
+read it when `XYMONAPI_URL` is not set. For a second server, set
+`XYMONAPI_URL`, `XYMONAPI_TOKEN_FILE` and `XYMONAPI_CA` as
+`xymonapi-connect URL NAME` prints them, or write a profile. What it also registers with Claude Code and
 Codex is for your own use of those agents; this command gives them the MCP
 server itself, on each call, and tells Claude Code to use no other.
 

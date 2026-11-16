@@ -7,8 +7,10 @@ API's own Unix socket on the server, where no credential is needed because
 the socket's permissions already say who may connect. Unset, it is that
 socket, XYMONAPI_SOCKET or $XYMONRUNDIR/xymonapi/local/api.sock
 ($XYMONSERVERLOGS when XYMONRUNDIR is empty), when the file is
-there -- the plugins' tasks on the server have both settings -- and
-http://127.0.0.1:1986 otherwise.
+there -- the plugins' tasks on the server have both settings -- then the
+API `xymonapi-connect URL` last connected this user to, kept in
+~/.config/xymon-api/xymon.url, with its token and CA beside it, each unless
+set; and http://127.0.0.1:1986 otherwise.
 XYMONAPI_TOKEN_FILE names a file holding a client token -- the one
 xymonapi-connect(1) keeps -- sent when the API asks for a user: the token
 is this machine's own, revoked on its own (xymonapi(8), TOKENS). It is the
@@ -40,17 +42,41 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlencode, urlsplit
 
 
+CONF = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "xymon-api"
+
+
+def _kept_url(name: str = "xymon") -> str:
+    """The URL xymonapi-connect kept for NAME, or "" when there is none."""
+    try:
+        return (CONF / f"{name}.url").read_text(encoding="utf-8").strip().rstrip("/")
+    except (OSError, UnicodeError):
+        return ""
+
+
 def _default_url() -> str:
     run = os.environ.get("XYMONRUNDIR") or os.environ.get("XYMONSERVERLOGS")
     sock = os.environ.get("XYMONAPI_SOCKET") or (
         os.path.join(run, "xymonapi", "local", "api.sock") if run else "")
-    return f"unix:{sock}" if sock and os.path.exists(sock) else "http://127.0.0.1:1986"
+    if sock and os.path.exists(sock):
+        return f"unix:{sock}"
+    return _kept_url() or "http://127.0.0.1:1986"
 
 
 URL = (os.environ.get("XYMONAPI_URL") or _default_url()).rstrip("/")
-CA = os.environ.get("XYMONAPI_CA", "")
+# Whether URL is the one kept: its token and CA go with it, to no other.
+_KEPT = not os.environ.get("XYMONAPI_URL") and urlsplit(URL).scheme != "unix" \
+    and URL == _kept_url()
+
+
+def _kept(name: str) -> str:
+    """CONF/xymonNAME's path when URL is the one kept beside it, else ""."""
+    f = CONF / f"xymon{name}"
+    return str(f) if _KEPT and f.is_file() else ""
+
+
+CA = os.environ.get("XYMONAPI_CA") or _kept("-ca.pem")
 TOKEN = os.environ.get("XYMONAPI_TOKEN", "")
-TOKEN_FILE = os.environ.get("XYMONAPI_TOKEN_FILE", "")
+TOKEN_FILE = os.environ.get("XYMONAPI_TOKEN_FILE") or ("" if TOKEN else _kept(".token"))
 
 
 def _token() -> str:
@@ -294,6 +320,18 @@ def _new_token(name: str) -> str:
     return token
 
 
+def _keep_url(conf: Path, name: str) -> None:
+    """Keep URL as NAME's, replacing the file whole. Not a credential."""
+    conf.mkdir(parents=True, exist_ok=True)
+    tmp = conf / f".{name}.url.{os.getpid()}"
+    try:
+        tmp.write_text(URL + "\n", encoding="utf-8")
+        os.replace(tmp, conf / f"{name}.url")
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def connect(argv: list[str]) -> int:
     global URL, CA, TOKEN, TOKEN_FILE, _opener
     if not argv or argv[0] in ("-h", "--help") or len(argv) > 2:
@@ -303,7 +341,7 @@ def connect(argv: list[str]) -> int:
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", name):
         _say(f"a name is letters, digits, '.', '_' and '-': not {name!r}")
         return 2
-    conf = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "xymon-api"
+    conf = CONF
     token_file, ca_file = conf / f"{name}.token", conf / f"{name}-ca.pem"
     URL, TOKEN, _opener = url, "", None
     local = urlsplit(URL).scheme == "unix"
@@ -316,7 +354,11 @@ def connect(argv: list[str]) -> int:
     try:
         # Reached and trusted before anything is asked. A token kept from
         # before is used while it works.
-        TOKEN_FILE = str(token_file) if token_file.is_file() and not local else ""
+        # Only one kept for this URL: sent elsewhere, it would go to a server
+        # it was not issued by. One kept with no URL beside it, from before
+        # the URL was kept, is not sent either: the password is asked once.
+        was = _kept_url(name)
+        TOKEN_FILE = str(token_file) if token_file.is_file() and not local and was == URL else ""
         try:
             health = api("/health")
         except APIError as e:
@@ -329,10 +371,23 @@ def connect(argv: list[str]) -> int:
             conf.mkdir(parents=True, exist_ok=True)
             TOKEN_FILE = ""
             token = _new_token(_machine())
-            fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w") as f:
-                f.write(token + "\n")
-            os.chmod(token_file, 0o600)
+            # The token and its URL change together: the old token goes
+            # first, the new one is written aside, the URL kept, and only
+            # then the token put in place. Stopped at any step, what is
+            # left is the old pair, an URL with no token, or the new pair:
+            # never a token beside an URL that did not issue it.
+            tmp = conf / f".{name}.token.{os.getpid()}"
+            try:
+                token_file.unlink(missing_ok=True)
+                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w") as f:
+                    f.write(token + "\n")
+                _keep_url(conf, name)
+                os.replace(tmp, token_file)
+            except OSError as e:
+                tmp.unlink(missing_ok=True)
+                raise APIError(f"cannot keep the token in {conf}: {e.strerror}; it is revoked by "
+                               "the API's /tokens") from e
             TOKEN_FILE = str(token_file)
             _say(f"a token for {_machine()} kept in {token_file} (mode 600); the API's /tokens lists and revokes it")
             health = api("/health")
@@ -342,10 +397,16 @@ def connect(argv: list[str]) -> int:
     except KeyboardInterrupt:
         print(file=sys.stderr)
         return 130
+    # Over the socket none is ever sent: one kept for the API's network URL
+    # stays for it.
+    if not TOKEN_FILE and not local and token_file.exists() and was != URL:
+        token_file.unlink()
+        origin = was if was and urlsplit(was).scheme != "unix" else "another URL"
+        _say(f"removed {token_file}, the token kept for {origin}: the API's /tokens there revokes it")
     if not TOKEN_FILE:
         _say(f"{URL} asks no credential: the socket's permissions, or the API's settings, let this "
-             "user in; nothing is kept here" if urlsplit(URL).scheme == "unix" else
-             f"{URL} asks no password, so no token is needed; nothing is kept here")
+             "user in; no credential is kept here" if urlsplit(URL).scheme == "unix" else
+             f"{URL} asks no password, so no token is needed; no credential is kept here")
     old = conf / f"{name}.password"
     if old.exists():
         old.unlink()
@@ -360,6 +421,12 @@ def connect(argv: list[str]) -> int:
     elif t and m and t > m:
         _say(f"the API runs xymonapi {theirs}, this machine's client {mine}: update here, "
              "with git pull && ./install.sh install-tools")
+    # The URL kept beside the token: a client given no XYMONAPI_URL reads
+    # the default name's. Not a credential.
+    try:
+        _keep_url(conf, name)
+    except OSError as e:
+        _say(f"cannot keep the URL in {conf}: {e.strerror}; a client given no XYMONAPI_URL will not find it")
     settings = {"XYMONAPI_URL": URL}
     if TOKEN_FILE:
         settings["XYMONAPI_TOKEN_FILE"] = TOKEN_FILE
