@@ -3,7 +3,6 @@
 # ./install.sh at the repository's top installs it from the lines below.
 name: xymonapi-agent
 version: 0.1.0
-side: client
 summary: one command that asks an AI agent -- Claude Code, Codex or opencode, headless -- a question about Xymon, with the MCP server as its only tool
 requires: xymonapi-mcp >= 0.1.0 (beside it, with xymonapi's client); one of the agent CLIs, installed and logged in; python >= 3.9
 manual: xymonapi-agent.1

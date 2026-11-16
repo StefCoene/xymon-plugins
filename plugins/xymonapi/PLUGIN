@@ -3,7 +3,6 @@
 # ./install.sh at the repository's top installs it from the lines below.
 name: xymonapi
 version: 5.0.2
-side: server, client
 summary: a read-only HTTP and JSON interface to a Xymon server, as one of its xymonlaunch tasks, and its client
 requires: python >= 3.9
 xymon: 4.3.31
