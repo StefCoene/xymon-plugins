@@ -102,7 +102,7 @@ there; with `DESTDIR`, the staged directories are plain ones.
 Then turn it on, `XYMONHOME=/usr/lib/xymon/server ./install.sh enable-server xymonapi`, and check:
 
 ```sh
-curl http://127.0.0.1:1986/xymon/api/v1/health              # the port: 401 means it runs and asks for a user
+curl http://127.0.0.1:1986/xymon/api/v1/health              # the port: 401 means it runs and asks for a user (https:// and --cacert where it speaks HTTPS)
 curl --unix-socket /run/xymon/xymonapi/local/api.sock http://localhost/xymon/api/v1/health   # the path the install printed
 ```
 

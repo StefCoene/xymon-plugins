@@ -342,10 +342,11 @@ def connect(argv: list[str]) -> int:
     try:
         # Reached and trusted before anything is asked. A token kept from
         # before is used while it works.
-        # Not one kept for another URL under the same name: sent there, it
-        # would go to a server it was not issued by.
+        # Only one kept for this URL: sent elsewhere, it would go to a server
+        # it was not issued by. One kept with no URL beside it, from before
+        # the URL was kept, is not sent either: the password is asked once.
         was = _kept_url(name)
-        TOKEN_FILE = str(token_file) if token_file.is_file() and not local and was in ("", URL) else ""
+        TOKEN_FILE = str(token_file) if token_file.is_file() and not local and was == URL else ""
         try:
             health = api("/health")
         except APIError as e:
@@ -371,6 +372,11 @@ def connect(argv: list[str]) -> int:
     except KeyboardInterrupt:
         print(file=sys.stderr)
         return 130
+    # Over the socket none is ever sent: one kept for the API's network URL
+    # stays for it.
+    if not TOKEN_FILE and not local and token_file.exists() and was != URL:
+        token_file.unlink()
+        _say(f"removed {token_file}, the token kept for {was or 'another URL'}: the API's /tokens there revokes it")
     if not TOKEN_FILE:
         _say(f"{URL} asks no credential: the socket's permissions, or the API's settings, let this "
              "user in; no credential is kept here" if urlsplit(URL).scheme == "unix" else

@@ -78,8 +78,8 @@ assert_contains "XYMONAPI_TOKEN_FILE=$tok" "$(cat "$work/out")" "and the token f
 assert_not_contains "XYMONAPI_CA" "$(cat "$work/out")" "and no certificate, over http"
 assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "it keeps the URL beside the token"
 # A client given no setting reads the URL kept, and sends the token beside it.
-assert_contains '"states"' "$(XDG_CONFIG_HOME="$cfg" HOME="$work" env -u XYMONAPI_URL -u XYMONAPI_TOKEN_FILE -u XYMONAPI_TOKEN -u XYMONAPI_CA -u XYMONAPI_SOCKET -u XYMONRUNDIR -u XYMONSERVERLOGS \
-	"${XYMONAPI_PYTHON:-python3}" -c 'import sys, json; sys.path.insert(0, sys.argv[1]); import xymonapi_client as c; print(json.dumps({"states": c.api("/states")}))' \
+assert_contains '"version"' "$(XDG_CONFIG_HOME="$cfg" HOME="$work" env -u XYMONAPI_URL -u XYMONAPI_TOKEN_FILE -u XYMONAPI_TOKEN -u XYMONAPI_CA -u XYMONAPI_SOCKET -u XYMONRUNDIR -u XYMONSERVERLOGS \
+	"${XYMONAPI_PYTHON:-python3}" -c 'import sys, json; sys.path.insert(0, sys.argv[1]); import xymonapi_client as c; print(json.dumps({"health": c.api("/health")}))' \
 	"$work/client/libexec/xymon-plugins/xymonapi" 2>&1)" "a client with no XYMONAPI_URL reaches the API connected to, with its token"
 assert_not_contains "differ" "$(cat "$work/err")" "the same version on both sides is not remarked on"
 assert_not_contains "runs xymonapi" "$(cat "$work/err")" "nor said at all"
@@ -127,11 +127,13 @@ api_at() {
 	url=http://127.0.0.1:$API_PORT
 }
 printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
+# Each restart is on another port, so another URL: the token kept is not
+# sent there, and the password is asked.
 api_at 0.0.1
-run < /dev/null
+run < "$work/in"
 assert_contains "the API runs xymonapi 0.0.1, this machine's client $mine: the server's admin" "$(cat "$work/err")" "an older API: the server's admin updates it"
 api_at 99.0.0
-run < /dev/null
+run < "$work/in"
 assert_contains "the API runs xymonapi 99.0.0, this machine's client $mine: update here" "$(cat "$work/err")" "an older client: this machine updates"
 api_at "$mine"
 
@@ -166,9 +168,16 @@ assert_contains "copy the server's certificate, or the CA that signed it, to $cf
 assert_not_contains "password" "$(cat "$work/err")" "before a password is asked"
 assert_not_contains "user:" "$(cat "$work/err")" "or a user"
 cp "$work/tls/xymond.pem" "$cfg/xymon-api/xymon-ca.pem"
+# A token kept for another server under the same name: this API asks none,
+# so it goes, and is said to, rather than be sent here by a client later.
+printf 'xat_issuedbyanother\n' > "$cfg/xymon-api/xymon.token"
+echo "https://another.example:8443" > "$cfg/xymon-api/xymon.url"
 run < /dev/null
 [ "$rc" -eq 0 ] || fail "with the certificate copied, it failed with $rc: $(cat "$work/err")"
 assert_contains "XYMONAPI_CA=$cfg/xymon-api/xymon-ca.pem" "$(cat "$work/out")" "the copied certificate is used, and printed"
 assert_not_contains "XYMONAPI_TOKEN_FILE" "$(cat "$work/out")" "an API that asks no password needs no token"
+[ -e "$cfg/xymon-api/xymon.token" ] && fail "a token kept for another URL was left beside this one's"
+assert_contains "the token kept for https://another.example:8443" "$(cat "$work/err")" "and its removal is said"
+assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "the URL kept is this one"
 
 pass "xymonapi-connect gets this machine a token with a password typed once, keeps it while it works, says a wrong password, a version difference and an untrusted certificate, and stops cleanly on Ctrl-C"
