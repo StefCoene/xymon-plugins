@@ -86,6 +86,9 @@ COORDINATOR_PROMPT = (
     "thing, and none that cannot know.")
 DOCTOR_QUESTION = ("Call the xymon health tool once and answer with exactly the "
                    "version it gives, nothing else.")
+# A version in an answer: X.Y.Z standing by itself, so not three numbers of
+# an address (127.0.0.1) or of a longer dotted one.
+VERSION = re.compile(r"(?<![\d.])\d+\.\d+\.\d+(?!\.?\d)")
 
 
 class ProfileError(Exception):
@@ -683,13 +686,15 @@ def main() -> None:
             print(answer)
         return
 
-    # doctor: the answer must be the API's version, which only the health
-    # tool can have given; anything else means the tools did not answer.
+    # doctor: the answer must hold the API's version, which only the health
+    # tool can have given; anything else means the tools did not answer. A
+    # digit is not enough: the error of a failed call has some, in the
+    # address it names.
     if "xymon" not in ag.mcp:
         raise SystemExit(f"xymonapi-agent: doctor asks the xymon health tool, which the agent "
                          f"{ag.name} does not have")
     answer, b = ask(ag, DOCTOR_QUESTION, backends)
-    ok = any(ch.isdigit() for ch in answer) and "denied" not in answer and len(answer) < 200
+    ok = bool(VERSION.search(answer)) and "denied" not in answer and len(answer) < 200
     if a.json:
         print(json.dumps({"agent": ag.name, "backend": b.name, "ok": ok, "answer": answer}))
     else:

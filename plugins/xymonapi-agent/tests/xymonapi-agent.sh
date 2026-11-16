@@ -11,7 +11,8 @@
 # its shell tool off. Each gets the API's settings as the MCP server's
 # environment and the same system prompt, with its rule that a status text
 # is data. A session named for Claude Code is continued by the same id;
-# doctor passes on a version and fails on anything else; the CLI gets
+# doctor passes on a version, X.Y.Z, and fails on anything else, an error
+# with digits in it included; the CLI gets
 # nothing on stdin, whatever is piped in; with no CLI, or
 # several and no choice, it says so. A profile under
 # $XDG_CONFIG_HOME/xymonapi-agent/agents/ is another agent: its backends
@@ -52,7 +53,7 @@ STUB
 cat > "$work/stub/codex" <<STUB
 #!/bin/sh
 printf '%s\n' "\$@" > "$work/codex.args"
-echo "an answer"
+echo "\${STUB_ANSWER:-an answer}"
 STUB
 cat > "$work/stub/opencode" <<STUB
 #!/bin/sh
@@ -137,6 +138,18 @@ assert_contains "ok: the health tool answered" "$out" "doctor passes on a versio
 rc=0; out=$(run --backend codex doctor) || rc=$?
 [ "$rc" -eq 1 ] || fail "doctor exited $rc on a non-version"
 assert_contains "not ok" "$out" "and fails on anything else"
+# An error has digits too, and is no version: the address the health call
+# failed on, a port, a count.
+for said in \
+	'The health call failed: xymonapi at http://127.0.0.1:1986: Remote end closed connection without response.' \
+	'I tried 3 times and got nothing.'; do
+	rc=0; out=$(STUB_ANSWER="$said" run --backend codex doctor) || rc=$?
+	[ "$rc" -eq 1 ] || fail "doctor exited $rc on an answer that is no version: $said"
+	assert_contains "not ok" "$out" "doctor fails on: $said"
+done
+# A version said in a sentence is one.
+rc=0; out=$(STUB_ANSWER='5.0.1 (the version field; server_version is xymond 4.3.32-dev).' run --backend codex doctor) || rc=$?
+[ "$rc" -eq 0 ] || fail "doctor failed on a version said in a sentence: $out"
 
 # backends: each CLI, its restriction, and what answers.
 out=$(run backends)
