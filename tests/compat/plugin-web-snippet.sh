@@ -159,6 +159,7 @@ assert_contains "/run/xymon/xymonapi/relay.sock" "$(cat "$h/ext/xymonapi/xymonap
 assert_not_contains "xymonapi-nginx.conf is kept as edited" "$(cat "$work/moved.log")" "[S16] and is not said to be edited"
 cmp -s "$work/edited3" "$h/ext/xymonapi/xymonapi-apache.conf" || fail "[S16] an edited snippet was replaced when the runtime directory moved"
 assert_contains "xymonapi-apache.conf is kept as edited" "$(cat "$work/moved.log")" "[S16] and is said to differ"
+assert_contains "xymonapi-apache.conf does not name /run/xymon" "$(cat "$work/moved.log")" "[S16] and to name a runtime directory that is not Xymon's"
 assert_contains "reload the web server" "$(cat "$work/moved.log")" "[S16] and the install says to reload the web server"
 # Edited still at the next install: the record of what was written is kept.
 "$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >"$work/moved2.log" 2>&1 || fail "install-server (moved, third) failed"
@@ -174,6 +175,16 @@ cp "$work/victim" "$h/ext/xymonapi/.shipped/xymonapi-nginx.conf"
 "$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >/dev/null 2>&1 || fail "install-server (link) failed"
 assert_equal "an outside file" "$(cat "$work/victim")" "[S16] an install does not write through a snippet made a link"
 [ -L "$h/ext/xymonapi/xymonapi-nginx.conf" ] && fail "[S16] the snippet made a link was left a link"
+
+# The same with a hard link, which is a plain file: the target is not
+# written either.
+echo "another outside file" > "$work/victim2"
+rm -f "$h/ext/xymonapi/xymonapi-lighttpd.conf"
+ln "$work/victim2" "$h/ext/xymonapi/xymonapi-lighttpd.conf"
+cp "$work/victim2" "$h/ext/xymonapi/.shipped/xymonapi-lighttpd.conf"
+"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >/dev/null 2>&1 || fail "install-server (hard link) failed"
+assert_equal "another outside file" "$(cat "$work/victim2")" "[S16] an install does not write through a snippet hard-linked to another file"
+assert_contains "relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-lighttpd.conf")" "[S16] and the snippet is this version's"
 
 # A version that drops a snippet: the install says to reload. The copy of
 # the checkout plays it, its PLUGIN naming one snippet fewer.

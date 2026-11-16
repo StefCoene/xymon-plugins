@@ -160,8 +160,9 @@ One that differs from both is the administrator's, kept, and the install
 says it differs. A web server goes on with the snippets it read until it
 reloads: when an install adds, replaces or drops a snippet, or an uninstall
 takes them away, it says to reload the web server, and reloads none itself;
-under `DESTDIR` there is none to reload. A snippet that is a link is written
-anew, never through.
+under `DESTDIR` there is none to reload. A snippet is written as a new file,
+never through a link, symbolic or hard; one kept as edited that does not
+name Xymon's runtime directory is said to.
 
 **S13. A plugin is on when its link is there.**
 A plugin's task is on when `etc/tasks.d/NAME` links to its task file, and

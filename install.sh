@@ -684,6 +684,9 @@ conf() {
 		if same "$1" "$c" "$dst"; then
 			cp -f "$dst" "$base/$c" || exit 1
 		elif { [ -f "$old" ] && cmp -s "$old" "$dst"; } || shipped "$1" "$c" "$dst"; then
+			# Unlinked first: written as a new file, never into one a hard
+			# link shares with a file outside the plugin's directory.
+			rm -f "$dst" || exit 1
 			stock "$1" "$c" > "$dst" && chmod 644 "$dst" || exit 1
 			cp -f "$dst" "$base/$c" || exit 1
 			echo "$dst, unedited, is replaced by this version's"
@@ -691,6 +694,10 @@ conf() {
 		else
 			if [ -f "$old" ]; then mv "$old" "$base/$c" || exit 1; fi
 			echo "$dst is kept as edited; this version's differs: compare it with $ROOT/plugins/$1/$c, @XYMONHOME@ being $XYMONHOME${RUNDIR:+ and @XYMONRUNDIR@ $RUNDIR}"
+			# Kept, it may name a runtime directory moved since.
+			if [ -n "$RUNDIR" ] && grep -q '@XYMONRUNDIR@' "$ROOT/plugins/$1/$c" && ! grep -qF "$RUNDIR/" "$dst"; then
+				echo "$dst does not name $RUNDIR, Xymon's runtime directory: a socket it names may be one that is no more"
+			fi
 		fi
 		rm -f "$old"
 	done
