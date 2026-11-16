@@ -328,13 +328,26 @@ brings its test.
   none and say how to make it. An environment that cannot be made does not
   fail the install, which says how to make it. `enable`
   refuses a plugin whose Python lacks the modules it needs, and `status`
-  says so. `connect URL` connects this machine to an API. It installs the
-  tools part of the plugin whose `PLUGIN` has a `connect:` line, then
-  hands over to that plugin, which gets a token and registers the AI tools
-  found. The command itself still names no plugin. It is POSIX `sh` and needs no `make`.
+  says so. It is POSIX `sh` and needs no `make`.
+- **`connect URL` links a part to a source.** For the person's tools, the
+  default, `--tools`, it links their session to an API: one plugin's
+  `PLUGIN` has a `connect:` line, `xymonapi`'s, which gets the token, the
+  password asked once; each plugin that hooks onto that link has an
+  `on-connect:` line, run after it, as `xymonapi-mcp`'s registers the AI
+  tools found. Both name a file of the plugin's tools part, run with the
+  URL, so that the command itself still names no plugin. On a terminal, a
+  menu offers the plugins with an `on-connect:` line, those installed
+  ticked; off one, those named on the command line, else those installed.
+  Tools already installed are kept, and the command says when the source
+  offers a newer version. A failure stops the run where it happens: no
+  hook runs without a token, and a hook that fails stops the ones after
+  it; what was installed stays. `connect` for the tools part is refused as
+  root: a link is the person's. With `--client`, `connect URL` links a
+  client to the Xymon server it takes its part from; with `--server`, a
+  server to a source of its own, a central server or a mirror.
 - **The parts are asked for, or named.** `--server`, `--client` and
-  `--tools` name the parts a verb acts on, for every verb; what they mean
-  for `connect`, and `--tools` for `enable` and `disable`, is open (below). `--server` and
+  `--tools` name the parts a verb acts on, for every verb; `--tools`
+  for `enable` and `disable` is open (below). `--server` and
   `--client` may be given together; `--tools` is given alone. Without them,
   on a terminal, the command asks which parts, offering those the
   installation a run targets (below) takes and the plugin has: on a
@@ -438,9 +451,10 @@ brings its test.
 - **Open, to decide.**
   - what `connected-server-warn` and `connected-server` do with code from
     a source other than the connected server;
-  - the `connect:` line's details: its value, two plugins declaring it,
-    tools already installed, a failure; `connect` run as root; which
-    selectors `connect` takes;
+  - for `connect --client` and `connect --server`: where the URL is kept,
+    with what trust, as a client has neither token nor certificate today,
+    and whether a token is needed; and whether a standalone client's
+    server URL, asked the first time, is asked by `connect --client` only;
   - the checkout `xymon-plugin` runs from: whether it is a source, under
     `DESTDIR`, offline, or with no release; where the list of plugins and
     "newer" come from;
@@ -454,8 +468,6 @@ brings its test.
     client's `xymonclient.cfg`, without which `XYMONTMP` is the server's;
   - removing a client part's directory by hand: what its launcher does
     with the link left (S9 says it for the server only);
-  - a standalone client's server URL: where it is kept, and off a
-    terminal the first time;
   - whether a server installed from a checkout serves an archive at all;
   - the current directory reached through a link, as Homebrew's `ext/`;
   - finding the server a client tree belongs to when detection does not;
@@ -463,8 +475,9 @@ brings its test.
     one or lists them all;
   - how a script makes the Python environment, as there is no verb for it
     and `install` off a terminal fetches nothing;
-  - whether `--tools` and `connect` ask for a Xymon installation, which
-    they do not need; whether `status --tools` run as root is refused.
+  - whether `--tools` and `connect --tools` ask for a Xymon installation,
+    which they do not need; whether `status --tools` run as root is
+    refused.
 - **Removing the directory by hand removes everything of that part.**
   Beyond the task (S9), what each program reads it reads through the place
   below, so that after `ext/NAME` is deleted Xymon no longer applies the
