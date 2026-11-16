@@ -136,6 +136,28 @@ for p in xymonapi xymonapi-rag; do
 	[ -f "$alone/ext/$p/VERSION" ] || fail "[S3] installing xymonapi-rag alone did not install $p, which it needs"
 done
 
+# Needs are read part by part: a server install reads server-needs:, the
+# same part of the plugin named unless NAME:part names another. A part the
+# install cannot hold, and a part that is none, are refused before anything
+# changes. A copy of the checkout plays each.
+needs_case() { # LINE LOG -- install-server xymonapi-agent with LINE as its server-needs:
+	r=$work/needs-$2; rm -rf "$r"; mkdir -p "$r"
+	cp -R "$ROOT/install.sh" "$ROOT/LICENSE" "$ROOT/plugins" "$r/"
+	sed "s|^server-needs: .*|server-needs: $1|" "$ROOT/plugins/xymonapi-agent/PLUGIN" > "$r/plugins/xymonapi-agent/PLUGIN"
+	h=$work/needs-home-$2; server_tree "$h"
+	rc=0; "$r/install.sh" install-server xymonapi-agent XYMONHOME="$h" MANDIR="$work/man-$2" </dev/null >"$work/needs-$2.log" 2>&1 || rc=$?
+}
+needs_case "xymonapi-mcp:server" explicit
+[ "$rc" -eq 0 ] || fail "[S3] server-needs: naming the server part explicitly failed: $(tail -n 3 "$work/needs-explicit.log")"
+[ -f "$h/ext/xymonapi-mcp/VERSION" ] || fail "[S3] and did not install the part it names"
+needs_case "xymonapi-mcp:tools" cross
+[ "$rc" -ne 0 ] || fail "[S3] a server part needing a tools part, which a server install cannot hold, was installed"
+assert_contains "cannot hold" "$(cat "$work/needs-cross.log")" "[S3] and the refusal says why"
+[ -e "$h/ext/xymonapi-agent" ] && fail "[S3] the refused plugin was installed anyway"
+needs_case "xymonapi-mcp:nopart" nopart
+[ "$rc" -ne 0 ] || fail "[S3] a need naming no part was taken"
+assert_contains "is no part" "$(cat "$work/needs-nopart.log")" "[S3] and the refusal says so"
+
 # install-client is refused by name, before any plugin is looked at: it says
 # the action is now install-tools, and installs nothing. "client" is Xymon's
 # word for a monitored host, which the action of that name will serve.

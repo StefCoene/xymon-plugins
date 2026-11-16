@@ -8,7 +8,8 @@ requires: xymonapi >= 0.1.0 (its client beside it; the API beside it on the serv
 manual: xymonapi-rag.1
 
 # How ./install.sh installs it: see xymonapi's PLUGIN file.
-needs: xymonapi
+server-needs: xymonapi
+tools-needs: xymonapi
 server-files: xymonrag.py xymonapi-rag.sh requirements.txt
 server-manual: xymonapi-rag.1
 server-modules: fastembed numpy

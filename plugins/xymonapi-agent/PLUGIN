@@ -8,7 +8,8 @@ requires: xymonapi-mcp >= 0.1.0 (beside it, with xymonapi's client); one of the 
 manual: xymonapi-agent.1
 
 # How ./install.sh installs it: see xymonapi's PLUGIN file.
-needs: xymonapi-mcp
+server-needs: xymonapi-mcp
+tools-needs: xymonapi-mcp
 server-files: xymonagent.py xymonapi-agent.sh
 server-manual: xymonapi-agent.1
 installed: Installed xymonapi-agent beside the API. /ask is off unless XYMONAPI_ASK=1 is set in a file under xymonserver.d/;

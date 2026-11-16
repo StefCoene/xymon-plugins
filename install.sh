@@ -181,26 +181,39 @@ known() {
 		|| die "no plugin $1 here: the plugins are $(echo $(all_plugins))"
 }
 
-# depth PLUGIN [ROOT] -- how many plugins deep it stands on: 0 for one that
-# needs none; by the records of the plugins installed under ROOT when
-# given, as an uninstall goes from the deepest up among what is installed.
+# needs PLUGIN PART [ROOT] -- the plugins its PART part needs, by its
+# PART-needs: line, or by the record under ROOT when given: each NAME, the
+# same part of it, or NAME:part for another part. A part this run does not
+# install -- a server install installs no tools, nor yet a client part --
+# is a need it cannot hold, refused.
+needs() {
+	if [ -n "${3:-}" ]; then v=$(held "$3" "$1" "$2-needs"); else v=$(field "$1" "$2-needs"); fi
+	for n in $v; do
+		case $n in
+			*:*) want=${n#*:}; n=${n%%:*} ;;
+			*) want=$2 ;;
+		esac
+		case $want in
+			server|client|tools) ;;
+			*) die "$1's $2-needs: names $n:$want, and $want is no part: server, client or tools" ;;
+		esac
+		[ "$want" = "$2" ] || die "$1's $2 part needs $n's $want part, which an install of the $2 part cannot hold"
+		echo "$n"
+	done
+}
+
+# depth PLUGIN PART ROOT -- how many plugins deep its PART part stands on,
+# by the records of the plugins installed under ROOT: 0 for one that needs
+# none, as an uninstall goes from the deepest up among what is installed.
 depth() {
 	# Always run in $(...): globbing off for this subshell only.
 	set -f
 	d=0
-	if [ -n "${2:-}" ]; then needs=$(held "$2" "$1" needs); else needs=$(field "$1" needs); fi
-	for n in $needs; do
+	for n in $(needs "$1" "$2" "$3"); do
 		plain "$n" || continue
-		x=$(depth "$n" "${2:-}"); [ $((x + 1)) -gt $d ] && d=$((x + 1))
+		x=$(depth "$n" "$2" "$3"); [ $((x + 1)) -gt $d ] && d=$((x + 1))
 	done
 	echo $d
-}
-
-# dependents PLUGIN -- the plugins that name it in their needs.
-dependents() {
-	for p in $(all_plugins); do
-		case " $(field "$p" needs) " in *" $1 "*) echo "$p" ;; esac
-	done
 }
 
 # older A B -- true when version A is older than B, comparing X.Y.Z by
@@ -224,7 +237,8 @@ CHECKED=
 xymon_ok() {
 	case " $CHECKED " in *" $1 "*) return 0 ;; esac
 	CHECKED="$CHECKED $1"
-	for n in $(field "$1" needs); do xymon_ok "$n"; done
+	ns=$(needs "$1" server) || exit 1
+	for n in $ns; do xymon_ok "$n"; done
 	want=$(field "$1" xymon); [ -n "$want" ] || return 0
 	xymon=$(inside "$XYMONHOME/bin/xymon") || exit 1
 	have=$("$xymon" --version 2>/dev/null | sed -n 's/^Xymon version \([0-9][0-9.]*[^ ]*\).*/\1/p')
@@ -854,7 +868,8 @@ venv() {
 DONE=
 install_server() {
 	case " $DONE " in *" $1 "*) return 0 ;; esac
-	for n in $(field "$1" needs); do known "$n"; install_server "$n"; done
+	ns=$(needs "$1" server) || exit 1
+	for n in $ns; do known "$n"; install_server "$n"; done
 	[ -n "$(field "$1" server-files)" ] || die "$1 has nothing to install on the server"
 	ext=$EXTROOT/$1
 	# A link in the plugin directory's place is not the plugin's: removed,
@@ -917,7 +932,8 @@ install_server() {
 
 install_tools() {
 	case " $DONE " in *" $1 "*) return 0 ;; esac
-	for n in $(field "$1" needs); do known "$n"; install_tools "$n"; done
+	ns=$(needs "$1" tools) || exit 1
+	for n in $ns; do known "$n"; install_tools "$n"; done
 	[ -n "$(field "$1" tools-files)" ] || die "$1 has nothing to install on your own machine"
 	dir=$TOOLSROOT/$1
 	if [ -L "$dir" ]; then rm -f "$dir" || exit 1; fi
@@ -951,13 +967,15 @@ install_tools() {
 	DONE="$DONE $1"
 }
 
-# needed PLUGIN DIR -- refuse to remove the plugin while one installed in DIR
-# needs it beside it: removing it would leave that one broken.
+# needed PLUGIN PART DIR -- refuse to remove the plugin's PART part while
+# one installed in DIR needs it beside it: removing it would leave that one
+# broken.
 needed() {
-	for p in "$2"/*; do
+	for p in "$3"/*; do
 		[ -d "$p" ] || continue
-		case " $(held "$2" "${p##*/}" needs) " in
-			*" $1 "*) die "$1 is needed by ${p##*/}, installed in $2: uninstall ${p##*/} first" ;;
+		ns=$(needs "${p##*/}" "$2" "$3") || exit 1
+		case " $ns " in
+			*" $1 "*) die "$1 is needed by ${p##*/}, installed in $3: uninstall ${p##*/} first" ;;
 		esac
 	done
 	return 0
@@ -1027,8 +1045,8 @@ with_installed() {
 }
 
 uninstall_server() {
-	needed "$1" "$EXTROOT"
-	needed "$1" "$DIST/plugins"
+	needed "$1" server "$EXTROOT"
+	needed "$1" server "$DIST/plugins"
 	m=$(held "$EXTROOT" "$1" server-manual)
 	t=$(held "$EXTROOT" "$1" task)
 	se=$(held "$EXTROOT" "$1" selinux)
@@ -1049,7 +1067,7 @@ uninstall_server() {
 }
 
 uninstall_tools() {
-	needed "$1" "$TOOLSROOT"
+	needed "$1" tools "$TOOLSROOT"
 	c=$(held "$TOOLSROOT" "$1" command)
 	m=$(held "$TOOLSROOT" "$1" tools-manual)
 	legacy=; [ -f "$TOOLSROOT/$1/PLUGIN" ] || legacy=1
@@ -1076,7 +1094,7 @@ esac
 for n in $NAMES; do known "$n"; done
 if [ -n "$NAMES" ]; then LIST=$NAMES; else LIST=$(all_plugins); fi
 deepest_first() {
-	for n in $LIST; do echo "$(depth "$n" "$1") $n"; done | sort -rn | cut -d' ' -f2
+	for n in $LIST; do echo "$(depth "$n" "$2" "$1") $n"; done | sort -rn | cut -d' ' -f2
 }
 
 case $ACTION in
@@ -1108,11 +1126,11 @@ case $ACTION in
 		# a link there would take the removal elsewhere.
 		prune_dist
 		[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
-		for n in $(deepest_first "$EXTROOT"); do uninstall_server "$n"; done
+		for n in $(deepest_first "$EXTROOT" server); do uninstall_server "$n"; done
 		[ -n "$NAMES" ] || rm -rf "$EXTROOT/venv" ;;
 	uninstall-tools)
 		[ -n "$NAMES" ] || LIST=$(with_installed "$TOOLSROOT")
-		for n in $(deepest_first "$TOOLSROOT"); do uninstall_tools "$n"; done
+		for n in $(deepest_first "$TOOLSROOT" tools); do uninstall_tools "$n"; done
 		if [ -z "$NAMES" ]; then
 			rm -rf "$TOOLSROOT/venv"
 			rmdir "$TOOLSROOT" 2>/dev/null || true

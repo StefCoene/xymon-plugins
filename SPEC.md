@@ -71,10 +71,14 @@ The `version:` line, `X.Y.Z`, moves as `CONTRIBUTING.md` (Versions) says. The
 install writes beside the installed files, in `VERSION`, the plugin's
 release tag when the checkout is at one, else that version.
 
-**S3. A plugin names the plugins it needs.**
-Its `needs:` line names them; the install of a plugin installs them with it,
-and its removal is refused while an installed plugin needs it, naming that
-plugin.
+**S3. A plugin names the plugins it needs, part by part.**
+Its `server-needs:` and `tools-needs:` lines name them for that part: the
+same part of each, or another with `NAME:part`. The install of a part
+installs what it needs with it; a need the install cannot hold -- a tools
+part for a server part, as a server install installs no tools -- and a
+part that is none are refused before anything changes. The removal of a
+part is refused while an installed plugin's same part needs it, naming
+that plugin.
 
 **S14. A plugin names the Xymon it needs.**
 A `xymon:` line in `PLUGIN`, `X.Y.Z`, gives the lowest Xymon version the
@@ -299,9 +303,8 @@ brings its test.
   A Xymon server has a client tree of its own, the `XYMONCLIENTHOME` its
   `xymonserver.cfg` names: it belongs to that server, and a plugin's client
   part installed on the server goes there. A client tree no server names is
-  a standalone client, a monitored host. Each part names the plugins it
-  needs on its own line, `tools-needs:`, `server-needs:`, `client-needs:`
-  (S3): the same part of each, or another with `PLUGIN:part`; a need the
+  a standalone client, a monitored host. A client part names what it
+  needs with `client-needs:`, as S3 has the other parts do; a need the
   target cannot hold, as a server part on a standalone client, refuses the
   install, saying why. Once built, this replaces S4's two
   sides and S18's refusal of a client's tree, and the `side:` lines of today's `PLUGIN` files, which call the
