@@ -12,9 +12,11 @@
 # this repository's tests/ and each plugins/NAME/tests/, under
 # tests/plugins/NAME/ -- since it checks the tree it sits in.
 #
-# One rule is left out: interpreter, no python or perl in a test. Xymon's
+# Two rules are left out. interpreter, no python or perl in a test: Xymon's
 # BSD lanes have no Python; every plugin here needs it, so a lane without
-# Python cannot run the plugins at all.
+# Python cannot run the plugins at all. rrdtool-cli, read a RRD through
+# librrd rather than the rrdtool command: the API runs that command itself,
+# so the plugins need it, and their tests with it (below).
 #
 # Skips where XYMON_SRC holds no portability check. Needs XYMON_SRC.
 
@@ -51,14 +53,19 @@ rc=0
 bash "$tree/tests/buildsystem/$(basename "$check")" > "$work/report" 2>&1 || rc=$?
 
 # The report gives each violation as "  [RULE] FILE:LINE" and its reason on the
-# next, indented line. Keep those of every rule but interpreter, with each
-# file named as it is in this repository. The make-tree rules exempt Xymon's
+# next, indented line. Keep those of every rule but interpreter and
+# rrdtool-cli, with each file named as it is in this repository. rrdtool-cli
+# keeps Xymon's tests on librrd, which Xymon links, as the rrdtool command is
+# not installed on every lane and a test gating on it checks less there. The
+# API runs the rrdtool command itself (plugins/xymonapi/xymon.py, rrdtool info
+# and xport): for the plugins it is what the product needs, and CI's
+# XYMONAPI_NO_SKIP=1 makes a skip for want of it a failure. The make-tree rules exempt Xymon's
 # tests/lib/assert.sh by its name, the one file where its helpers read the
 # make tree on purpose; its copy here goes by another name, so it is exempted
 # from them the same way, and from nothing else.
 awk '
 	/^  \[[a-z-]+\] / {
-		keep = ($1 != "[interpreter]") && !($1 ~ /^\[make-tree-/ && $2 ~ /^tests\/lib\/assert-xymon\.sh:/)
+		keep = ($1 != "[interpreter]") && ($1 != "[rrdtool-cli]") && !($1 ~ /^\[make-tree-/ && $2 ~ /^tests\/lib\/assert-xymon\.sh:/)
 		if (keep) print; next
 	}
 	/^      / { if (keep) print; next }
@@ -75,4 +82,4 @@ if [ "$rc" -ne 0 ] && ! grep -q 'violation(s); see above' "$work/report"; then
 	fail "Xymon's portability check did not run: $(tail -n 5 "$work/report")"
 fi
 
-pass "the plugins' tests and install.sh keep to Xymon's portability rules, but the one against Python, which every plugin needs"
+pass "the plugins' tests and install.sh keep to Xymon's portability rules, but the one against Python, which every plugin needs, and the one against the rrdtool command, which the API runs"

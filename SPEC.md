@@ -264,7 +264,8 @@ only; installing from `stable` installs tested code.
 
 **S12. The installer runs on every machine a plugin goes to.**
 `install.sh` and the tests keep to Xymon's portability rules, but the one
-against Python, which every plugin needs.
+against Python, which every plugin needs, and the one against the
+`rrdtool` command, which the API runs to read the RRD files.
 
 ## Planned
 
