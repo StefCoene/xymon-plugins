@@ -33,7 +33,8 @@ to come.
   directory, or a file that program reads only when it exists.
 - **Removing the directory removes the plugin.** Deleting an `ext/NAME`
   directory by hand is a valid way to take away the part installed there;
-  the plugin is gone once every directory holding one of its parts is.
+  the plugin is gone once every directory holding one of its parts has
+  been removed.
   Then no task of it runs, no setting of it
   applies, nothing of it is served, and no program reports an error. What is
   left is at most a link that points nowhere, which every reader skips, and
@@ -284,13 +285,14 @@ brings its test.
 
 
 - **A plugin has up to three parts.** Each is declared by its own lines of
-  `PLUGIN`, and a plugin has one, two or all three:
+  `PLUGIN`, and a plugin has one, two or all three. The server and client
+  parts are its Xymon parts:
 
   | part | lines | where | installed by |
   |---|---|---|---|
   | tools | `tools-*` | any machine, under `PREFIX` (`~/.local`) | the person, as themselves |
   | server | `server-*` | a Xymon server's tree, `ext/NAME/` | the user that may write it, usually root |
-  | client | `client-*` | a Xymon client's tree, `ext/NAME/`, its task started from a standalone client's `clientlaunch.d`, or on a server from the server's `tasks.d`, which runs its own client | the same |
+  | client | `client-*` | a Xymon client's tree, `ext/NAME/`, its task started from a standalone client's `clientlaunch.d`, or, for a server's own client, from that server's `tasks.d` | the same |
 
   A Xymon server has a client tree of its own, the `XYMONCLIENTHOME` its
   `xymonserver.cfg` names: it belongs to that server, and a plugin's client
@@ -301,7 +303,7 @@ brings its test.
   lines declare. A client part keeps its runtime files in `$XYMONTMP/NAME`
   and its logs in `XYMONCLIENTLOGS`, the places Xymon gives a client; a
   server part keeps its runtime files in `XYMONRUNDIR` (S22) and its logs
-  in Xymon's log directory; the checks under `checks/`, copied into place by hand today, each
+  in Xymon's log directory. The checks under `checks/`, copied into place by hand today, each
   move under `plugins/` as a client part when they get a `PLUGIN` file.
 - **One command, read as a sentence.** `xymon-plugin`, at the top of the
   repository, replaces `install.sh`, and takes a verb and the plugins it
@@ -318,7 +320,8 @@ brings its test.
   ```
 
   With no plugin named, a verb acts on every plugin of the installation it
-  targets (below), but `remove`, which needs a plugin named, or `--all`.
+  targets (below), but `remove`, which needs a plugin named, or `--all`;
+  what `install` with no plugin named takes is open (below).
   The Python environment a plugin needs is made and completed by `install`
   and `update`, with no verb of its own. On a terminal they ask before
   fetching modules; off a terminal, and under `DESTDIR` (S21), they fetch
@@ -330,12 +333,14 @@ brings its test.
   hands over to that plugin, which gets a token and registers the AI tools
   found. The command itself still names no plugin. It is POSIX `sh` and needs no `make`.
 - **The parts are asked for, or named.** `--server`, `--client` and
-  `--tools` name the parts a verb acts on, for every verb. `--server` and
+  `--tools` name the parts a verb acts on, for every verb; what they mean
+  for `connect`, and `--tools` for `enable` and `disable`, is open (below). `--server` and
   `--client` may be given together; `--tools` is given alone. Without them,
   on a terminal, the command asks which parts, offering those the
   installation a run targets (below) takes and the plugin has: on a
   server's tree, its server part, and its client part into the server's
-  own client tree; on a standalone client's tree, its client part. Off a
+  own client tree; on a standalone client's tree, its client part --
+  whether it asks when only one applies is open (below). Off a
   terminal, a verb that changes a Xymon part needs them; `status` without
   them covers every part. A part the plugin does not
   have is skipped when not named, and refused when named, saying why. On a
@@ -348,12 +353,12 @@ brings its test.
   is given. A refusal comes before
   anything changes. A machine with no Xymon installation installs no Xymon
   part, and says that the tools are installed with `--tools` or `connect`.
-- **A run acts on one Xymon installation, which `XYMONHOME` names.**
+- **A run changes one Xymon installation, which `XYMONHOME` names.**
   An installation is a Xymon tree, a server's, marked by
   `etc/xymonserver.cfg` and `bin/xymond`, with its own client tree, or a
   standalone client's, marked by `etc/xymonclient.cfg` and
   `bin/xymonclient.sh`. A machine may hold several installations, and a run
-  acts on one. `XYMONHOME`, or `--xymon-home PATH`, is the only thing that
+  changes one; `status` may read them all. `XYMONHOME`, or `--xymon-home PATH`, is the only thing that
   chooses it without asking -- running under `xymoncmd`, which sets it, counts as naming
   it; `--xymon-home` wins when both are given, which the first line says --
   and it is checked against its marks (S18). A `XYMONHOME` that is the
@@ -373,9 +378,10 @@ brings its test.
   found: a script's target depends neither on its current directory nor
   on what runs at that moment. `status` then lists the trees, what each
   holds, and the person's tools. Every
-  run says on its first line the target, the parts, and what chose them,
-  detected or named. As decided in #39, no record of the target is written:
-  an installed part keeps only its `PLUGIN` and `VERSION`.
+  run says, before it changes anything, the target, the parts, and what
+  chose them: named, or detected and confirmed. As decided in #39, no record of the target is written
+  in an installed part, which keeps only its `PLUGIN` and `VERSION`; the
+  one used last is remembered apart (open, below).
 - **With no verb on a terminal, the command shows where things stand, then
   offers what applies.** Run with no verb, its input and its output on a
   terminal, it first says what it found: the Xymon installation, by the
@@ -425,11 +431,17 @@ brings its test.
     with the link left (S9 says it for the server only);
   - a standalone client's server URL: where it is kept, and off a
     terminal the first time;
-  - the archive `/plugins` serves for a server installed from a checkout;
+  - whether a server installed from a checkout serves an archive at all;
   - the current directory reached through a link, as Homebrew's `ext/`;
   - finding the server a client tree belongs to when detection does not;
   - where "the one used last" is kept, per machine or per person, and
-    what is proposed when it is gone.
+    what is proposed when it is gone;
+  - on a terminal, with several installations, whether `status` asks for
+    one or lists them all;
+  - how a script makes the Python environment, as there is no verb for it
+    and `install` off a terminal fetches nothing;
+  - whether `--tools` and `connect` ask for a Xymon installation, which
+    they do not need; whether `status --tools` run as root is refused.
 - **Removing the directory by hand removes everything of that part.**
   Beyond the task (S9), what each program reads it reads through the place
   below, so that after `ext/NAME` is deleted Xymon no longer applies the
@@ -439,7 +451,7 @@ brings its test.
   |---|---|---|
   | settings | `ext/NAME/xymonserver.cfg` | a link in `etc/xymonserver.d/`, which Xymon reads after `xymonserver.cfg` |
   | manual page | `ext/NAME/` | a link in `MANDIR` |
-  | what `/plugins` serves | `ext/NAME/`, the release archive it was installed from | the API, serving that archive at `/plugins/NAME` |
+  | what `/plugins` serves | the release archive the part was installed from, kept in `ext/NAME/` | the API, serving that archive at `/plugins/NAME` |
   | Python modules | `ext/NAME/venv/` | the plugin's own launcher |
 
   A plugin that needs Python modules beyond the standard library has its
