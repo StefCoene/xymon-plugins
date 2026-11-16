@@ -179,5 +179,50 @@ assert_not_contains "XYMONAPI_TOKEN_FILE" "$(cat "$work/out")" "an API that asks
 [ -e "$cfg/xymon-api/xymon.token" ] && fail "a token kept for another URL was left beside this one's"
 assert_contains "the token kept for https://another.example:8443" "$(cat "$work/err")" "and its removal is said"
 assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "the URL kept is this one"
+stop_process "$API_PID"; API_PID=""
+
+# An API that issues a token, then fails the /health that follows: the
+# token stays beside its own URL, never the one kept before. A stand-in
+# of the test's own: 401 without a token, a token for a password, 500
+# with it.
+cat > "$work/issuer.py" <<'PY'
+import http.server, json, sys
+class H(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def _r(self, code, body):
+        b = json.dumps(body).encode()
+        self.send_response(code); self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+    def do_GET(self):
+        self._r(500 if self.headers.get("Authorization", "").startswith("Bearer") else 401, {"error": "x"})
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        self._r(201, {"token": "xat_issuedbyF"})
+http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
+PY
+fport=$(free_port)
+"${XYMONAPI_PYTHON:-python3}" "$work/issuer.py" "$fport" & API_PID=$!
+for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$fport/" && break; sleep 0.3; done
+cfg=$work/cfg4; mkdir -p "$cfg/xymon-api"
+printf 'xat_issuedbyA\n' > "$cfg/xymon-api/xymon.token"
+echo "https://a.example:8443" > "$cfg/xymon-api/xymon.url"
+url=http://127.0.0.1:$fport
+printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
+assert_equal "1" "$rc" "a /health that fails after the token is issued fails the run"
+assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "the URL kept is the one that issued the token"
+assert_equal "xat_issuedbyF" "$(cat "$cfg/xymon-api/xymon.token")" "beside its token"
+
+# Where the URL cannot be kept -- a directory in its place, which no
+# rename replaces, as root too -- the run fails, said so with no
+# traceback, and no token is left for a client to send anywhere.
+printf 'xat_issuedbyA\n' > "$cfg/xymon-api/xymon.token"
+rm -f "$cfg/xymon-api/xymon.url"; mkdir "$cfg/xymon-api/xymon.url"
+printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
+assert_equal "1" "$rc" "a token whose URL cannot be kept fails the run"
+assert_contains "cannot keep the token" "$(cat "$work/err")" "and says so"
+assert_not_contains "Traceback" "$(cat "$work/err")" "with no traceback"
+[ -e "$cfg/xymon-api/xymon.token" ] && fail "a token was left with no URL kept beside it"
+assert_equal "" "$(ls -A "$cfg/xymon-api" | grep '^\.')" "and nothing written aside is left"
+stop_process "$API_PID"; API_PID=""
 
 pass "xymonapi-connect gets this machine a token with a password typed once, keeps it while it works, says a wrong password, a version difference and an untrusted certificate, and stops cleanly on Ctrl-C"

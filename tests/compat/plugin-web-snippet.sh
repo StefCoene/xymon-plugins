@@ -139,6 +139,8 @@ XYMONSERVERLOGS="/var/log/xymon"    # Logs')" "[S22] with XYMONRUNDIR empty, the
 assert_contains "/run/xymon/xymonapi/relay.sock" "$(cfgcase plain 'XYMONRUNDIR=/run/xymon')" "[S22] an unquoted XYMONRUNDIR is read"
 assert_contains "@XYMONRUNDIR@/xymonapi/relay.sock" "$(cfgcase var 'XYMONRUNDIR="$XYMONVAR/run"')" "[S22] one that names a variable is left as @XYMONRUNDIR@"
 assert_contains "put Xymon's runtime directory in its place" "$(cat "$work/var.log")" "[S22] and the install says so"
+assert_not_contains "register unix:" "$(cat "$work/var.log")" "[S22] and gives no socket path, nor a command, it cannot know"
+assert_not_contains "<" "$(cat "$work/var.log")" "[S22] nor a placeholder to type"
 # Set again in xymonserver.d/, which Xymon reads after xymonserver.cfg: that
 # value wins; an editor's backup there is left out, as Xymon leaves it.
 h=$work/dropin; server_tree "$h"

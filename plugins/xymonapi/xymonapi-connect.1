@@ -46,7 +46,9 @@ that was revoked. A token is sent only to the URL kept beside it: given
 another URL under the same NAME, or run first after an update from a
 version that kept no URL, it asks the password again; and where the new
 URL asks none, it removes the token kept for the old one, which that
-server's /tokens revokes. Messages go to stderr. A password file an earlier setup
+server's /tokens revokes. The URL is kept as soon as a token is: a run
+that fails after the API issued it leaves that URL the default, with its
+token, rather than the one before. Messages go to stderr. A password file an earlier setup
 kept, ~/.config/xymon-api/NAME.password, is removed.
 
 NAME, xymon by default, tells one API from another: each has its own token

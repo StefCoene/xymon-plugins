@@ -324,8 +324,12 @@ def _keep_url(conf: Path, name: str) -> None:
     """Keep URL as NAME's, replacing the file whole. Not a credential."""
     conf.mkdir(parents=True, exist_ok=True)
     tmp = conf / f".{name}.url.{os.getpid()}"
-    tmp.write_text(URL + "\n", encoding="utf-8")
-    os.replace(tmp, conf / f"{name}.url")
+    try:
+        tmp.write_text(URL + "\n", encoding="utf-8")
+        os.replace(tmp, conf / f"{name}.url")
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def connect(argv: list[str]) -> int:
@@ -367,13 +371,23 @@ def connect(argv: list[str]) -> int:
             conf.mkdir(parents=True, exist_ok=True)
             TOKEN_FILE = ""
             token = _new_token(_machine())
-            fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w") as f:
-                f.write(token + "\n")
-            os.chmod(token_file, 0o600)
-            # The URL with it at once: a run that fails after this leaves
-            # the token beside the URL that issued it, not the one before.
-            _keep_url(conf, name)
+            # The token and its URL change together: the old token goes
+            # first, the new one is written aside, the URL kept, and only
+            # then the token put in place. Stopped at any step, what is
+            # left is the old pair, an URL with no token, or the new pair:
+            # never a token beside an URL that did not issue it.
+            tmp = conf / f".{name}.token.{os.getpid()}"
+            try:
+                token_file.unlink(missing_ok=True)
+                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w") as f:
+                    f.write(token + "\n")
+                _keep_url(conf, name)
+                os.replace(tmp, token_file)
+            except OSError as e:
+                tmp.unlink(missing_ok=True)
+                raise APIError(f"cannot keep the token in {conf}: {e.strerror}; it is revoked by "
+                               "the API's /tokens") from e
             TOKEN_FILE = str(token_file)
             _say(f"a token for {_machine()} kept in {token_file} (mode 600); the API's /tokens lists and revokes it")
             health = api("/health")
@@ -409,7 +423,10 @@ def connect(argv: list[str]) -> int:
              "with git pull && ./install.sh install-tools")
     # The URL kept beside the token: a client given no XYMONAPI_URL reads
     # the default name's. Not a credential.
-    _keep_url(conf, name)
+    try:
+        _keep_url(conf, name)
+    except OSError as e:
+        _say(f"cannot keep the URL in {conf}: {e.strerror}; a client given no XYMONAPI_URL will not find it")
     settings = {"XYMONAPI_URL": URL}
     if TOKEN_FILE:
         settings["XYMONAPI_TOKEN_FILE"] = TOKEN_FILE

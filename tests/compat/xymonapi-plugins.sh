@@ -64,6 +64,9 @@ PATH="$work/nomake:$PATH" "$work/laptop/xymon-plugins/install.sh" install-tools 
 assert_contains "Installed xymonapi-mcp " "$(cat "$work/client.log")" "install-tools says what it installed"
 assert_contains "Installed xymonapi " "$(cat "$work/client.log")" "and what it needs, installed beside it"
 assert_contains "xymonapi-mcp register URL" "$(cat "$work/client.log")" "and the next step"
+case ":$PATH:" in *":$work/prefix/bin:"*) ;; *)
+	assert_equal "1" "$(grep -c 'not on PATH' "$work/client.log")" "that its bin is not on PATH, once for the two plugins" ;;
+esac
 [ -e "$work/make.called" ] && fail "installing from the archive ran make: $(cat "$work/make.called")"
 for c in xymonapi-mcp xymonapi-connect; do
 	[ -x "$work/prefix/bin/$c" ] || fail "installing from the archive gave no $c"
