@@ -336,7 +336,8 @@ brings its test.
   installation a run targets (below) takes and the plugin has: on a
   server's tree, its server part, and its client part into the server's
   own client tree; on a standalone client's tree, its client part. Off a
-  terminal, a verb on a Xymon part needs them. A part the plugin does not
+  terminal, a verb that changes a Xymon part needs them; `status` without
+  them covers every part. A part the plugin does not
   have is skipped when not named, and refused when named, saying why. On a
   server, `--client` means the server's own client tree; `--server` asked
   of a standalone client's tree is refused. The tools part is never
@@ -366,8 +367,8 @@ brings its test.
   tree a found server names is part of that server, not another
   installation. On a terminal, without a name, with a verb or with none,
   the one installation found is proposed, and the person confirms, Enter
-  for yes; several are listed, with as default the one holding the current
-  directory, else the only one running, else none. Off a terminal, without
+  for yes; several are listed, with as default the one used last, else none:
+  neither the current directory nor what runs at that moment chooses it. Off a terminal, without
   a name, a verb that changes a Xymon part is refused, listing the trees
   found: a script's target depends neither on its current directory nor
   on what runs at that moment. `status` then lists the trees, what each
@@ -426,7 +427,9 @@ brings its test.
     terminal the first time;
   - the archive `/plugins` serves for a server installed from a checkout;
   - the current directory reached through a link, as Homebrew's `ext/`;
-  - finding the server a client tree belongs to when detection does not.
+  - finding the server a client tree belongs to when detection does not;
+  - where "the one used last" is kept, per machine or per person, and
+    what is proposed when it is gone.
 - **Removing the directory by hand removes everything of that part.**
   Beyond the task (S9), what each program reads it reads through the place
   below, so that after `ext/NAME` is deleted Xymon no longer applies the
@@ -472,7 +475,7 @@ Directions the rules leave room for, not yet decided:
   attestation, and so that monitored hosts get their plugins from the
   server. `xymon-plugin` stays the command that installs the first plugin.
   Discussed in #29.
-- **Working across installations.** A `status` of every installation on the
-  machine together, comparing their versions, installing into several in
-  one run. Nothing acts on two installations at once until then. Discussed
-  in #39.
+- **Working across installations.** Comparing their versions, installing
+  into several in one run. Reading several is allowed -- `status` lists
+  them all -- but nothing changes two installations in one run until then.
+  Discussed in #39.
