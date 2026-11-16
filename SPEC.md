@@ -292,7 +292,7 @@ brings its test.
   |---|---|---|---|
   | tools | `tools-*` | any machine, under `PREFIX` (`~/.local`) | the person, as themselves |
   | server | `server-*` | a Xymon server's tree, `ext/NAME/` | the user that may write it, usually root |
-  | client | `client-*` | a Xymon client's tree, `ext/NAME/`, its task started from a standalone client's `clientlaunch.d`, or, for a server's own client, from that server's `tasks.d` | the same |
+  | client | `client-*` | a Xymon client's tree, `ext/NAME/`, its task started from a standalone client's `clientlaunch.d`, or, for a server's own client, from that server's `tasks.d`, its link named `NAME-client` and its task given the client's `xymonclient.cfg` as its `ENVFILE` | the same |
 
   A Xymon server has a client tree of its own, the `XYMONCLIENTHOME` its
   `xymonserver.cfg` names: it belongs to that server, and a plugin's client
@@ -320,8 +320,10 @@ brings its test.
   ```
 
   With no plugin named, a verb acts on every plugin of the installation it
-  targets (below), but `remove`, which needs a plugin named, or `--all`;
-  what `install` with no plugin named takes is open (below).
+  targets (below), but `install` and `remove`, which need a plugin named,
+  or `--all`. `install` refuses a plugin already installed, and `update`
+  one that is not: once built, `update` does what S7 says of installing
+  again.
   The Python environment a plugin needs is made and completed by `install`
   and `update`, with no verb of its own. On a terminal they ask before
   fetching modules; off a terminal, and under `DESTDIR` (S21), they fetch
@@ -419,7 +421,12 @@ brings its test.
   parts, from GitHub; a standalone client's part, from the Xymon server it
   reports to, whose URL is asked the first time, as `XYMONSERVERS` gives
   an address and no URL. A source named with `--source` is trusted: what it
-  gives is installed unchecked, and the first line says so.
+  gives is installed unchecked, and the first line says so. Under
+  `DESTDIR`, the source is the checkout `xymon-plugin` runs from. Where the
+  default source can give nothing -- unreachable, no release, or, for the
+  tools, no server connected yet -- that checkout is offered, `[y/N]`, on
+  a terminal; off one, `--source .` names it. The plugins offered, and
+  what is newer, are the source's.
 - **Code no proof checks follows a setting, `trust`.** From a source not
   named, code that matches no release on GitHub -- every plugin's today,
   as none has a release yet -- is handled as `trust` says:
@@ -455,17 +462,9 @@ brings its test.
     with what trust, as a client has neither token nor certificate today,
     and whether a token is needed; and whether a standalone client's
     server URL, asked the first time, is asked by `connect --client` only;
-  - the checkout `xymon-plugin` runs from: whether it is a source, under
-    `DESTDIR`, offline, or with no release; where the list of plugins and
-    "newer" come from;
-  - where the tools part comes from before the first `connect`;
-  - `install` with no plugin named, and how `install` and `update` differ;
   - `enable` and `disable` for a part with no task, as `--tools`;
   - whether the command asks for the parts when only one applies;
   - whether `needs:` (S3) holds part by part;
-  - on a server, the name of a client part's link in `tasks.d`, which may
-    be the server part's, and the environment its task runs with, the
-    client's `xymonclient.cfg`, without which `XYMONTMP` is the server's;
   - removing a client part's directory by hand: what its launcher does
     with the link left (S9 says it for the server only);
   - whether a server installed from a checkout serves an archive at all;
