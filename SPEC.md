@@ -30,7 +30,10 @@ to come.
   `ext/NAME/` on a monitored host, `$PREFIX/libexec/xymon-plugins/NAME/` on
   your own machine. What another program must find elsewhere -- a task, a
   setting, a manual page, a web server snippet -- is a link into that
-  directory, or a file that program reads only when it exists.
+  directory, or a file that program reads only when it exists. Every
+  other place a plugin may write is listed, once, in the Planned item "A
+  plugin writes only where this rule says": a place not listed there is
+  not a plugin's to write.
 - **Removing the directory removes the plugin.** Deleting an `ext/NAME`
   directory by hand is a valid way to take away the part installed there;
   the plugin is gone once every directory holding one of its parts has
@@ -501,7 +504,109 @@ brings its test.
   `SUDO_USER`'s under `sudo`, else the account's that runs it; when it is gone, there is no default, and
   the command says so. `status --tools` run as root reads the tools of
   that person too.
+- **A plugin writes only where this rule says.** An install writes a
+  plugin's files under its directory, and outside it only: its task link,
+  `etc/tasks.d/NAME` (S13); the link to its manual page in `MANDIR` (S20);
+  its command in `$PREFIX/bin` (S4); its copy in the stage `/plugins`
+  serves (S19); the virtualenv beside the plugins (S26); and its SELinux
+  module (S23). The command itself writes, besides, only the installation
+  used last (S25). While it runs, a plugin writes only: its sockets, in its
+  directory of Xymon's runtime directory (S22); its log, in Xymon's log
+  directory; and what its `PLUGIN` file declares -- a `data:` line for each
+  directory it keeps for the administrator or the person, which outlives
+  it (S10), and a `writes:` line for each file of another program that one
+  of its commands changes, with the command that does. A `data:` path is
+  `$XYMONVAR/NAME/`, `$XDG_CONFIG_HOME/NAME/`, `$XDG_CACHE_HOME/NAME/` or
+  `$XDG_STATE_HOME/NAME/`, `NAME` being the plugin's own or that of a
+  plugin it needs (S3); a `writes:` path names one file. A line that does
+  neither is refused before anything is installed. An install, an update
+  and a removal leave nothing anywhere else: the test compares the whole
+  tree, and the person's home, before and after. The plugins declare:
+  `xymonapi`, `data: $XYMONVAR/xymonapi/` and `data:
+  $XDG_CONFIG_HOME/xymonapi/`; `xymonapi-rag`, `data:
+  $XDG_CACHE_HOME/xymonapi-rag/`; `xymonapi-mcp`, `writes: ~/.claude.json`
+  and `writes: ~/.codex/config.toml`, by `xymonapi-mcp register`;
+  `xymonapi-agent`, `data: $XDG_STATE_HOME/xymonapi-agent/`. With it, the
+  client of `xymonapi` keeps its URL, token and certificate in
+  `$XDG_CONFIG_HOME/xymonapi/`, its own name, in place of `xymon-api/`,
+  which is read no more: a change that breaks, with its line in
+  UPGRADING.
+- **An install records what it wrote.** The last step of an install or an
+  update writes `MANIFEST` in the plugin's directory, beside `VERSION` and
+  `PLUGIN`: one line for each file it wrote there, with its cksum, and one
+  for each thing it put outside -- the task link, the manual page's link,
+  the command, the staged copy, the SELinux module -- with what it is: a
+  link and its target, or a file and its cksum. The task file and the web
+  server snippets are marked as the administrator's to edit. It lies in
+  the plugin's directory, so removing that directory removes it; and in a
+  directory the Xymon user can write, so it decides nothing alone: a
+  removal takes away what S20 allows, no more. A plugin installed before
+  the manifest existed has none until it is updated. The `data:` and
+  `writes:` lines of the `PLUGIN` copy say what the plugin's own commands
+  may have written since.
+- **`verify` says what differs from what was installed.** `verify
+  --server` and `verify --tools` change nothing. They say two things,
+  apart. First, for each plugin of the part, or those named, what its
+  `MANIFEST` and its files disagree on, one line each. Broken, as the
+  plugin may no longer do what was installed: a file missing; a file
+  changed that is not the administrator's to edit; a link outside the
+  directory gone, or pointing elsewhere; a command that is no longer the
+  one installed; and a file in the plugin's directory that the manifest
+  does not name and that can run or be imported -- one with an execute
+  bit, or named `*.py`, `*.pyc`, `*.pth`, `*.so` or `*.sh`. Untidy, as it
+  works all the same: any other file there that the manifest does not
+  name. What Python writes for itself, a `__pycache__` directory and the
+  `*.pyc` in it, is passed over. A file the manifest marks the
+  administrator's is said edited, and is neither; a plugin with no
+  manifest is said not checked, and is neither. Then, with no plugin
+  named, what is left in the part that belongs to no plugin installed,
+  untidy too: a task link, a manual page's link or a command of a plugin
+  whose directory is gone (S9); a staged copy of one; a stage or a
+  virtualenv with no plugin beside it. Each line names the command that
+  puts it right: `update` for a plugin's files, `clean` for what is left.
+  It exits 0 when nothing is broken or untidy, 3 when something is
+  broken, whatever else is untidy, and 4 when something is untidy and
+  nothing broken. It needs no terminal, and, as `status`, lists every
+  installation found when none is named (S25).
+- **`clean` takes away what no installed plugin owns.** `clean --server`
+  and `clean --tools` need a name, or `--all`, as `remove` does (S24).
+  They remove what `verify` lists as left, and nothing else: never a file
+  in an installed plugin's directory, which `update` replaces (S7), nor
+  anything a `data:` or `writes:` line names, which is the
+  administrator's or the person's. A name given is that of a plugin that
+  is gone: a plain file name (S20), refused when a plugin of that name is
+  installed in the part, naming `remove`. What is left of it is what bears
+  its name: `tasks.d/NAME`, its staged copy, and the links and commands
+  that point into its directory. `--all` covers every such name, and the
+  stage and the virtualenv when no plugin is installed beside them. A
+  thing is removed only when it is provably a plugin's, as S20 says of a
+  removal: a link only if it points into a plugin's directory that is
+  gone, a command only if it is, byte for byte, the one an install writes
+  for such a directory. It first says the target (S25) and lists what it
+  will remove. On a terminal it asks `Proceed? [y/N]`, so that Enter
+  removes nothing. Off one it removes nothing, and says so, unless `--yes`
+  is given: the same run, without it, shows what would go, and exits 4, as
+  `verify` does for what is untidy. With nothing left, it says so and
+  exits 0. What it could not prove a plugin's it leaves, and says.
+- **Once those four are built, the rules in force follow.** S24's verbs
+  gain `verify` and `clean`: `status` and `verify` cover both parts
+  without a selector; `install`, `remove` and `clean` need a plugin named,
+  or `--all`; run as root, `clean --tools` is refused as a verb that
+  changes the tools, `verify --tools` is not. S27's dialogue offers to
+  check what is installed and, when something is left that no plugin
+  owns, to take it away. S8 ends: the removal of the last plugin of a
+  part takes away what the plugins shared there, the virtualenv, and on
+  the server the stage `/plugins` serves -- today only `--all` does. S9's
+  link left behind is taken away by the next removal, or `clean`. The
+  usage gains `verify`, `clean` and `--yes`.
 - **Open, to decide.**
+  - where the search index lies on a server: `$XDG_CACHE_HOME/xymonapi-rag/`
+    today, which the item above allows as `data:`, or under `$XYMONVAR`,
+    where Xymon keeps its own;
+  - the exact form of a `MANIFEST` line, and of a `writes:` line (a path,
+    then the command in parentheses, or otherwise);
+  - how much of "while it runs" a test can check: plugin by plugin, its
+    tests run with a scratch home and compared, and the rest declared;
   - how a client authenticates to its source: with the repository plugin
     (Later, #29);
   - the option that answers "a standalone client" when the command asks;
