@@ -31,9 +31,10 @@ assert_contains "No virtualenv at $work/server/ext/venv" "$(cat "$work/install.l
 [ -e "$work/server/ext/venv" ] && fail "a virtualenv directory was left from the empty file"
 
 rc=0
-"$ROOT/xymon-plugin" venv --server XYMONHOME="$work/server" PYTHON="$work/bad/python3.12" </dev/null > "$work/venv.log" 2>&1 || rc=$?
-[ "$rc" -ne 0 ] || fail "venv-server with an empty file for a Python succeeded: $(cat "$work/venv.log")"
-assert_contains "made no virtualenv at $work/server/ext/venv" "$(cat "$work/venv.log")" "venv-server says the Python made none"
+"$ROOT/xymon-plugin" update --server --venv XYMONHOME="$work/server" MANDIR="$work/man" PYTHON="$work/bad/python3.12" </dev/null > "$work/venv.log" 2>&1 || rc=$?
+[ "$rc" -eq 0 ] || fail "update --venv with an empty file for a Python stopped the update: $(cat "$work/venv.log")"
+assert_contains "No virtualenv at $work/server/ext/venv" "$(cat "$work/venv.log")" "update --venv says no Python here has the modules, and makes none"
+[ -e "$work/server/ext/venv" ] && fail "update --venv left a virtualenv from an empty file"
 
 # A Python with the modules whose venv fails.
 printf '#!/bin/sh\ncase "$*" in *"-m venv"*) echo "ensurepip is not available" >&2; exit 1 ;; *executable*) echo "$0" ;; esac\nexit 0\n' > "$work/bad/python3"

@@ -83,6 +83,10 @@ tools "$v1" uninstall xymonapi-mcp
 # The server side.
 home=$work/server
 server_tree "$home"
+# enable refuses a plugin whose Python lacks its modules: a stand-in that
+# has every one, as nothing here runs the plugin.
+printf '#!/bin/sh\nexit 0\n' > "$work/haspy"; chmod 755 "$work/haspy"
+export XYMONAPI_PYTHON="$work/haspy"
 server() { v=$1 a=$2; shift 2; [ "$a" = uninstall ] && a=remove; "$v/xymon-plugin" "$a" --server "$@" XYMONHOME="$home" MANDIR="$work/man" </dev/null >"$work/server.log" 2>&1; }
 
 server "$v1" install xymonapi-rag || fail "install-server xymonapi-rag failed: $(tail -n 5 "$work/server.log")"

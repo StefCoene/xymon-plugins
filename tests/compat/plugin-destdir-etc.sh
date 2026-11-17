@@ -131,10 +131,10 @@ run install tools; check "install-tools, bin an absolute link"
 # No virtualenv is made or used under DESTDIR, a link there or not.
 fresh; run install server
 ln -s "$host" "$stage$home/ext/venv"
-rc=0; "$ROOT/xymon-plugin" venv --server XYMONHOME="$home" DESTDIR="$stage" </dev/null >"$work/venv.log" 2>&1 || rc=$?
-[ "$rc" -ne 0 ] || fail "[S21] venv-server under DESTDIR succeeded"
-assert_contains "not under DESTDIR" "$(cat "$work/venv.log")" "[S21] and says why"
-check "venv-server under DESTDIR"
+rc=0; "$ROOT/xymon-plugin" update --server --venv XYMONHOME="$home" DESTDIR="$stage" </dev/null >"$work/venv.log" 2>&1 || rc=$?
+[ "$rc" -eq 0 ] || fail "update --server --venv under DESTDIR failed: $(tail -n 3 "$work/venv.log")"
+assert_contains "Under DESTDIR no virtualenv is made or used" "$(cat "$work/venv.log")" "[S21] under DESTDIR --venv makes no virtualenv, and says so"
+check "update --server --venv under DESTDIR"
 
 # A directory at tasks.d/NAME is no task link: enable refuses it.
 fresh; run install server

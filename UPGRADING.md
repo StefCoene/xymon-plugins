@@ -10,13 +10,15 @@ that breaks the API's contract without a line here.
 The installer is `./xymon-plugin`, with a verb and the part it acts on:
 `install-server NAME` is `install --server NAME`, `install-tools` is
 `install --tools`, `uninstall-*` is `remove`, and so for `enable`,
-`disable`, `status` and `venv`; `install.sh` is gone, and each old action
+`disable` and `status`; `venv-server` and `venv-tools` are `update --venv`,
+the virtualenv having no verb of its own; `install.sh` is gone, and each old action
 is refused, naming the new form. What breaks: a script that calls
 `install.sh`. Also: `install` and `remove` need a plugin named, or `--all`;
 `install` refuses a plugin installed already, which `update` replaces; a
 script names the part, `--server` or `--tools`; and the tools are refused
-as root unless `PREFIX` or `DESTDIR` is given. What is installed, and
-where, is unchanged.
+as root unless `PREFIX` or `DESTDIR` is given; off a terminal, modules are
+fetched only with `--venv`; `enable` refuses a plugin whose Python lacks
+its modules. What is installed, and where, is unchanged.
 
 ## xymonapi-connect asks the password once more, from xymonapi 5.0.2
 

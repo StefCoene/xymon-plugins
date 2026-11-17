@@ -51,7 +51,7 @@ py=$(command -v "${XYMONAPI_PYTHON:-python3}")
 ln -s "$py" "$work/stub/python3"
 path="$work/stub:/usr/bin:/bin"
 
-# A virtualenv beside the plugins, as ./xymon-plugin venv --tools makes one: left as it
+# A virtualenv beside the plugins, as ./xymon-plugin update --tools --venv makes one: left as it
 # is, since the launchers run with it (tests/compat/xymonapi-python.sh).
 mkdir -p "$work/client/libexec/xymon-plugins/venv/bin"
 printf 'carol\nsecret\n' > "$work/in"
