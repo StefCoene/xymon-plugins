@@ -405,6 +405,29 @@ xymon_trees() {
 	rm -f "${TMPDIR:-/tmp}/xymon-plugin-trees.$$"
 }
 
+# client_home SERVER -- the client tree SERVER's xymonserver.cfg names as
+# its XYMONCLIENTHOME, as written, or nothing.
+client_home() {
+	c=$(sed -n 's/^[[:space:]]*XYMONCLIENTHOME[[:space:]]*=[[:space:]]*//p' "$1/etc/xymonserver.cfg" 2>/dev/null \
+		| tail -n 1 | sed -e 's/[[:space:]]*#.*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")
+	case $c in *'$'*) c= ;; esac
+	printf '%s\n' "$c"
+}
+
+# show_client SERVER -- its client tree's section: where it is, and each
+# plugin installed there, or that there is none.
+show_client() {
+	c=$(client_home "$1")
+	if [ -z "$c" ]; then echo "Its client: none named in $1/etc/xymonserver.cfg"; return 0; fi
+	echo "Its client $c:"
+	any=
+	for d in "$c"/ext/*/; do
+		[ -f "$d/PLUGIN" ] && [ -f "$d/VERSION" ] || continue
+		d=${d%/}; any=1; echo "  ${d##*/}: $(sed -e 's|^.*/v||' "$d/VERSION") installed"
+	done
+	[ -n "$any" ] || echo "  no plugin"
+}
+
 # person_conf -- the directory of the person who typed the command:
 # SUDO_USER's under sudo, else the account's that runs it.
 person_conf() {
@@ -1135,7 +1158,7 @@ install_server() {
 	conf "$1"
 	if [ -n "${UPDATING:-}" ]; then w=Updated; else w=Installed; fi
 	echo "$w $1 $(sed -e 's|^.*/v||' "$ext/VERSION") in $XYMONHOME/ext/$1."
-	say "$1" installed
+	[ -n "${UPDATING:-}" ] || say "$1" installed
 	restart "$1"
 	# A module the installed version loaded and this one has not goes.
 	if [ -n "$was_selinux" ] && [ -z "$(field "$1" selinux)" ] && [ -z "$DESTDIR" ] && command -v semodule >/dev/null 2>&1; then
@@ -1189,7 +1212,7 @@ install_tools() {
 	if [ -n "$(field "$1" command)" ] && [ -z "$DESTDIR" ] && [ -z "${PATHSAID:-}" ]; then
 		case ":$PATH:" in *":$PREFIX/bin:"*) ;; *) echo "The commands are in $PREFIX/bin, which is not on PATH: add it, as export PATH=\"$PREFIX/bin:\$PATH\" in your shell's profile."; PATHSAID=1 ;; esac
 	fi
-	say "$1" installed-tools
+	[ -n "${UPDATING:-}" ] || say "$1" installed-tools
 	DONE="$DONE $1"
 }
 
@@ -1334,6 +1357,7 @@ dialogue() {
 			fi
 			echo "  $n $v$st"
 		done
+		show_client "$XYMONHOME"
 	else
 		echo "No Xymon server here."
 	fi
@@ -1346,24 +1370,31 @@ dialogue() {
 	opts=
 	add() { opts="$opts$1	$2
 "; }
+	# The installation, in the command printed, by --xymon-home; quoted
+	# where a shell would split it.
 	hx=
-	[ -z "$XYMONHOME" ] || hx="XYMONHOME=$XYMONHOME "
 	if [ -n "$XYMONHOME" ]; then
-		for n in $(all_plugins); do
+		case $XYMONHOME in *[!A-Za-z0-9._/+-]*) hx=" --xymon-home '$XYMONHOME'" ;; *) hx=" --xymon-home $XYMONHOME" ;; esac
+	fi
+	# The plugins, those others need first.
+	ordered() { for p in $(all_plugins); do echo "$(depth "$p" "$1" "") $p"; done | sort -n | cut -d' ' -f2; }
+	short() { v=$(field "$1" "$2-short"); [ -n "$v" ] || v=$(field "$1" summary); printf '%s\n' "$v"; }
+	if [ -n "$XYMONHOME" ]; then
+		for n in $(ordered server); do
 			[ -n "$(field "$n" server-files)" ] || continue
 			installed "$EXTROOT" "$n" >/dev/null && continue
 			w=; for d in $(needs "$n" server 2>/dev/null); do installed "$EXTROOT" "$d" >/dev/null || w="$w $d"; done
-			add "install $n on the server${w:+, with$w}: $(field "$n" summary)" "${hx}$me install --server $n"
+			add "install $n on the server${w:+, with$w}: $(short "$n" server)" "$me install --server$hx $n"
 		done
 		any=
 		for n in $(all_plugins); do
 			installed "$EXTROOT" "$n" >/dev/null || continue
 			any=1
 			[ -n "$(held "$EXTROOT" "$n" task)" ] || continue
-			if [ -L "$TASKDIR/$n" ]; then add "turn $n off" "${hx}$me disable --server $n"
-			else add "turn $n on" "${hx}$me enable --server $n"; fi
+			if [ -L "$TASKDIR/$n" ]; then add "turn $n off" "$me disable --server$hx $n"
+			else add "turn $n on" "$me enable --server$hx $n"; fi
 		done
-		[ -z "$any" ] || add "update the server's plugins" "${hx}$me update --server"
+		[ -z "$any" ] || add "update the server's plugins" "$me update --server$hx"
 		for n in $(all_plugins); do
 			installed "$EXTROOT" "$n" >/dev/null || continue
 			by=
@@ -1372,14 +1403,14 @@ dialogue() {
 				case " $(needs "$p" server "$EXTROOT" 2>/dev/null) " in *" $n "*) by="$by $p" ;; esac
 			done
 			[ -z "$by" ] || continue
-			add "remove $n from the server" "${hx}$me remove --server $n"
+			add "remove $n from the server" "$me remove --server$hx $n"
 		done
 	fi
 	tany=
-	for n in $(all_plugins); do
+	for n in $(ordered tools); do
 		[ -n "$(field "$n" tools-files)" ] || continue
 		if installed "$TOOLSROOT" "$n" >/dev/null; then tany=1; continue; fi
-		add "install $n for you: $(field "$n" summary)" "$me install --tools $n"
+		add "install $n for you: $(short "$n" tools)" "$me install --tools $n"
 	done
 	[ -z "$tany" ] || add "update your tools" "$me update --tools"
 	echo
@@ -1406,7 +1437,7 @@ dialogue() {
 		*" install --server "*)
 			n=${cmd##* }
 			if [ -n "$(field "$n" task)" ]; then
-				ecmd="${hx}$me enable --server $n"
+				ecmd="$me enable --server$hx $n"
 				echo "Turn it on now?"
 				echo "I will run:  $ecmd"
 				if offer "Proceed?"; then eval "$ecmd" || exit $?; else echo "$n stays off: $ecmd turns it on."; fi
@@ -1418,8 +1449,13 @@ if [ "$VERB" = dialogue ]; then dialogue; exit 0; fi
 
 # The part acted on: named, or, on a terminal, the server part, said; off a
 # terminal a verb that changes something needs it named; status covers both.
-[ -z "$SEL_TOOLS" ] || [ -z "$SEL_SERVER" ] \
-	|| die "--tools goes alone: the tools are the person's, the server part its tree's owner's"
+if [ -n "$SEL_TOOLS" ] && [ -n "$SEL_SERVER" ]; then
+	[ "$VERB" != status ] || die "--tools goes alone: ./xymon-plugin status, with neither, shows both"
+	rest=$(echo $NAMES)${ALL:+ --all}
+	die "--tools goes alone, as the tools are the person's and the server part its tree's owner's: run
+  ./xymon-plugin $VERB --server${rest:+ $rest}
+  ./xymon-plugin $VERB --tools${rest:+ $rest}"
+fi
 if [ -n "$SEL_TOOLS" ]; then PART=tools
 elif [ -n "$SEL_SERVER" ]; then PART=server
 elif [ "$VERB" = status ]; then PART=both
@@ -1517,13 +1553,16 @@ case $VERB in
 				XYMONHOME=$t; server_paths
 				L=$LIST; [ -n "$NAMES" ] || L=$(with_installed "$EXTROOT")
 				for n in $L; do l=$(status server "$EXTROOT" "$n"); [ -z "$l" ] || echo "  $l"; done
+				show_client "$t"
 			done < "${TMPDIR:-/tmp}/xymon-plugin-status.$$"
 			rm -f "${TMPDIR:-/tmp}/xymon-plugin-status.$$"
 			XYMONHOME=
 		elif [ "$PART" != tools ]; then
 			need_home
+			echo "Xymon server $XYMONHOME:"
 			L=$LIST; [ -n "$NAMES" ] || L=$(with_installed "$EXTROOT")
-			for n in $L; do status server "$EXTROOT" "$n"; done
+			for n in $L; do l=$(status server "$EXTROOT" "$n"); [ -z "$l" ] || echo "  $l"; done
+			[ -n "$DESTDIR" ] || show_client "$XYMONHOME"
 		fi
 		if [ "$PART" != server ]; then
 			L=$LIST; [ -n "$NAMES" ] || L=$(with_installed "$TOOLSROOT")

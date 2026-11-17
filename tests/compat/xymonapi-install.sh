@@ -182,6 +182,8 @@ r "is installed already" install --server xymonapi
 r "is not installed: ./xymon-plugin install --tools xymonapi-agent" update --tools xymonapi-agent
 r "the tools have no task" enable --tools xymonapi
 r "--tools goes alone" install --server --tools xymonapi
+r "./xymon-plugin install --tools xymonapi" install --server --tools xymonapi
+r "status, with neither, shows both" status --server --tools
 r "--all, or plugins named: not both" install --server --all xymonapi
 [ -e "$work/refused" ] && fail "[S24] a refused verb installed something"
 # Run as root, the tools are refused without PREFIX or DESTDIR: they would
@@ -210,6 +212,7 @@ mkdir -p "$prefix/libexec/xymon-plugins/venv" && : > "$prefix/libexec/xymon-plug
 	|| fail "xymon-plugin install --tools a second time failed: $(tail -n 5 "$work/client2.log")"
 [ -e "$prefix/libexec/xymon-plugins/xymonapi-rag/gone.py" ] && fail "a file no longer shipped stayed in the client's xymonapi-rag"
 assert_contains "Updated xymonapi-rag " "$(cat "$work/client2.log")" "[S24] update says it updated, not installed"
+assert_not_contains "Next" "$(cat "$work/client2.log")" "[S24] and gives no first install's help"
 assert_file_exists "$prefix/libexec/xymon-plugins/venv/kept"
 for f in xymonapi-mcp/server.py xymonapi-mcp/xymonapi-mcp.sh xymonapi/xymonapi_client.py xymonapi/xymonapi-connect.sh \
          xymonapi-rag/xymonrag.py xymonapi-rag/xymonapi-rag.sh xymonapi-rag/requirements.txt xymonapi-mcp/VERSION xymonapi-rag/VERSION; do

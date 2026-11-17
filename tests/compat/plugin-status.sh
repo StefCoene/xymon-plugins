@@ -43,7 +43,7 @@ cmp -s "$work/before" "$work/after" || fail "[S15] status changed the installati
 
 "$ROOT/xymon-plugin" enable --server xymonapi XYMONHOME="$home" >/dev/null 2>&1 || fail "enable-server failed"
 assert_contains "xymonapi: $here installed, on;" "$(st xymonapi)" "[S15] on once enabled"
-assert_equal 1 "$(st xymonapi | wc -l | tr -d ' ')" "[S15] a plugin named is the only one told of"
+assert_equal 1 "$(st xymonapi | grep -cE "^ *xymonapi[a-z-]*: ")" "[S15] a plugin named is the only one told of"
 
 echo "xymonapi/v0.0.1" > "$home/ext/xymonapi/VERSION"
 assert_contains "xymonapi: 0.0.1 installed, on; this checkout has $here, newer" "$(st xymonapi)" "[S15] an older install, by its release tag, has a newer version here"

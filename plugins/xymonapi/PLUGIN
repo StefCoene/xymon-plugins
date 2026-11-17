@@ -4,6 +4,8 @@
 name: xymonapi
 version: 5.0.2
 summary: a read-only HTTP and JSON interface to a Xymon server, as one of its xymonlaunch tasks, and its client
+server-short: the HTTP API, a xymonlaunch task
+tools-short: xymonapi-connect, to connect this machine to the API
 requires: python >= 3.9
 xymon: 4.3.31
 manual: xymonapi.8
@@ -11,7 +13,8 @@ manual: xymonapi.8
 # How ./xymon-plugin installs it. server-* and tools-* are each side's: the
 # files copied beside the plugin's others, the manual page, the modules its
 # Python needs (offered at install time), the plugins it needs first, the
-# same part of each, or another with NAME:part.
+# same part of each, or another with NAME:part. server-short and
+# tools-short say each part in a few words, for the dialogue's menu.
 # xymon is the lowest Xymon its server side works with.
 # executable lists the files made 755, the others 644; command is the
 # tools' command in $PREFIX/bin and the script it runs; task, conf and
