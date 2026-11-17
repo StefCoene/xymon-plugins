@@ -60,16 +60,16 @@ assert_equal "401" "$(curl -s --unix-socket "$sock" -o /dev/null -w '%{http_code
 # on stdin, asks nothing, keeps the URL alone, and prints the URL alone -- not a
 # token or a certificate this machine keeps for the same API by URL, which
 # have no part over the socket.
-mkdir -p "$work/cfg/xymon-api"
-printf 'xat_notthisone\n' > "$work/cfg/xymon-api/xymon.token"
-printf 'not a certificate\n' > "$work/cfg/xymon-api/xymon-ca.pem"
+mkdir -p "$work/cfg/xymonapi"
+printf 'xat_notthisone\n' > "$work/cfg/xymonapi/xymon.token"
+printf 'not a certificate\n' > "$work/cfg/xymonapi/xymon-ca.pem"
 rc=0
 XDG_CONFIG_HOME="$work/cfg" "$ROOT/plugins/xymonapi/xymonapi-connect.sh" "unix:$sock" </dev/null >"$work/connect.out" 2>"$work/connect.err" || rc=$?
 assert_equal "0" "$rc" "xymonapi-connect over the socket: connected ($(cat "$work/connect.err"))"
 assert_equal "XYMONAPI_URL=unix:$sock" "$(cat "$work/connect.out")" "its settings: the URL alone, not the token file or the CA kept here"
 assert_contains "asks no credential" "$(cat "$work/connect.err")" "and it says why there is no token"
-assert_equal "xat_notthisone" "$(cat "$work/cfg/xymon-api/xymon.token")" "the token kept for the URL is left as it is"
-assert_equal "unix:$sock" "$(cat "$work/cfg/xymon-api/xymon.url")" "it keeps the socket's URL, for a client given none"
+assert_equal "xat_notthisone" "$(cat "$work/cfg/xymonapi/xymon.token")" "the token kept for the URL is left as it is"
+assert_equal "unix:$sock" "$(cat "$work/cfg/xymonapi/xymon.url")" "it keeps the socket's URL, for a client given none"
 
 # The MCP server reads the API through it.
 mcp "unix:$sock" '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"health","arguments":{}}}' \

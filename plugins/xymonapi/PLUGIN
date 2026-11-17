@@ -2,10 +2,12 @@
 # it alone. One key per line, a key repeated for each line of a message;
 # ./xymon-plugin at the repository's top installs it from the lines below.
 name: xymonapi
-version: 5.0.2
+version: 6.0.0
 summary: a read-only HTTP and JSON interface to a Xymon server, as one of its xymonlaunch tasks, and its client
 server-short: the HTTP API, a xymonlaunch task
 tools-short: xymonapi-connect, to connect this machine to the API
+data: $XYMONVAR/xymonapi/
+data: $XDG_CONFIG_HOME/xymonapi/
 requires: python >= 3.9
 xymon: 4.3.31
 manual: xymonapi.8
@@ -14,7 +16,12 @@ manual: xymonapi.8
 # files copied beside the plugin's others, the manual page, the modules its
 # Python needs (offered at install time), the plugins it needs first, the
 # same part of each, or another with NAME:part. server-short and
-# tools-short say each part in a few words, for the dialogue's menu.
+# tools-short say each part in a few words, for the dialogue's menu. data
+# is a directory the plugin keeps for the administrator or the person,
+# under $XYMONVAR, $XDG_CONFIG_HOME, $XDG_CACHE_HOME or $XDG_STATE_HOME, in
+# its own name or that of a plugin it needs; writes, a file of another
+# program one of its commands changes, then that command in parentheses
+# (SPEC, S28).
 # xymon is the lowest Xymon its server side works with.
 # executable lists the files made 755, the others 644; command is the
 # tools' command in $PREFIX/bin and the script it runs; task, conf and
@@ -56,4 +63,4 @@ tools-manual: xymonapi-connect.1
 command: xymonapi-connect xymonapi-connect.sh
 executable: xymonapi.sh xymonapi-connect.sh
 installed-tools: Next: xymonapi-connect URL connects this machine to the API (xymonapi-mcp register runs it); the plugins beside it then read it with no setting.
-uninstalled-tools: Uninstalled xymonapi's client. Kept: the tokens in ~/.config/xymon-api/, which the API's /tokens revokes.
+uninstalled-tools: Uninstalled xymonapi's client. Kept: the tokens in ~/.config/xymonapi/, which the API's /tokens revokes.

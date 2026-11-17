@@ -291,6 +291,48 @@ older() {
 	}'
 }
 
+# declared_ok PLUGIN -- refuse, before anything is installed, a data: or
+# writes: line S28 does not allow, in the plugin or one it needs: data: a
+# directory $XYMONVAR/NAME/, $XDG_CONFIG_HOME/NAME/, $XDG_CACHE_HOME/NAME/
+# or $XDG_STATE_HOME/NAME/, NAME the plugin's own or one it needs; writes:
+# one file, then the command that changes it, in parentheses.
+DECLARED=
+declared_ok() {
+	case " $DECLARED " in *" $1 "*) return 0 ;; esac
+	DECLARED="$DECLARED $1"
+	own=" $1 "
+	for n in $(field "$1" server-needs) $(field "$1" tools-needs) $(field "$1" client-needs); do
+		own="$own${n%%:*} "
+	done
+	field "$1" data > "${TMPDIR:-/tmp}/xymon-plugin-data.$$"
+	while IFS= read -r d; do
+		[ -n "$d" ] || continue
+		case $d in
+			'$XYMONVAR/'*/|'$XDG_CONFIG_HOME/'*/|'$XDG_CACHE_HOME/'*/|'$XDG_STATE_HOME/'*/) ;;
+			*) rm -f "${TMPDIR:-/tmp}/xymon-plugin-data.$$"
+			   die "$1's data: $d is no directory S28 allows: \$XYMONVAR/NAME/, \$XDG_CONFIG_HOME/NAME/, \$XDG_CACHE_HOME/NAME/ or \$XDG_STATE_HOME/NAME/" ;;
+		esac
+		n=${d#*/}; n=${n%/}
+		case $n in ''|*/*) rm -f "${TMPDIR:-/tmp}/xymon-plugin-data.$$"; die "$1's data: $d names no single directory" ;; esac
+		case $own in *" $n "*) ;; *) rm -f "${TMPDIR:-/tmp}/xymon-plugin-data.$$"; die "$1's data: $d is in the name of $n, which is neither $1 nor a plugin it needs" ;; esac
+	done < "${TMPDIR:-/tmp}/xymon-plugin-data.$$"
+	field "$1" writes > "${TMPDIR:-/tmp}/xymon-plugin-data.$$"
+	while IFS= read -r w; do
+		[ -n "$w" ] || continue
+		case $w in
+			?*' ('?*')') ;;
+			*) rm -f "${TMPDIR:-/tmp}/xymon-plugin-data.$$"; die "$1's writes: $w is not a file, then the command that changes it in parentheses" ;;
+		esac
+		f=${w% (*}
+		case $f in */|*' '*) rm -f "${TMPDIR:-/tmp}/xymon-plugin-data.$$"; die "$1's writes: $w names no single file" ;; esac
+	done < "${TMPDIR:-/tmp}/xymon-plugin-data.$$"
+	rm -f "${TMPDIR:-/tmp}/xymon-plugin-data.$$"
+	for n in $(field "$1" server-needs) $(field "$1" tools-needs) $(field "$1" client-needs); do
+		n=${n%%:*}
+		[ ! -f "$ROOT/plugins/$n/PLUGIN" ] || declared_ok "$n"
+	done
+}
+
 # xymon_ok PLUGIN -- refuse the plugin, or one it needs, when its xymon:
 # line names a newer Xymon than the server's, unless --force; say so when
 # the server's cannot be read. Run on every plugin to install before any is
@@ -1498,6 +1540,7 @@ deepest_first() {
 
 case $VERB in
 	install)
+		for n in $LIST; do [ ! -f "$ROOT/plugins/$n/PLUGIN" ] || declared_ok "$n"; done
 		# A plugin named that is installed already is refused, before
 		# anything changes; --all and what one needs pass over them.
 		for n in $NAMES; do
@@ -1513,6 +1556,7 @@ case $VERB in
 		fi ;;
 	update)
 		UPDATING=1
+		for n in $LIST $NAMES; do [ ! -f "$ROOT/plugins/$n/PLUGIN" ] || declared_ok "$n"; done
 		for n in $NAMES; do
 			installed "$PARTROOT" "$n" >/dev/null || die "$n is not installed: ./xymon-plugin install --$PART $n"
 		done

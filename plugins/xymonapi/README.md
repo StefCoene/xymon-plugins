@@ -134,7 +134,7 @@ time and `XYMONAPI_ASK_PER_HOUR` an hour. Sessions are per caller. Check it
 as the Xymon user with `xymonapi-agent doctor`, then:
 
 ```sh
-curl -s -H "Authorization: Bearer $(cat ~/.config/xymon-api/xymon.token)" \
+curl -s -H "Authorization: Bearer $(cat ~/.config/xymonapi/xymon.token)" \
   -H 'Content-Type: application/json' -d '{"question":"anything red, and since when?"}' \
   https://xymon.example.ch/xymon/api/v1/ask
 ```
@@ -219,8 +219,8 @@ that a POSIX shell, `curl` and Python 3.9 or later, nothing else:
 ```sh
 # Only when the certificate is the server's own, not one the machine trusts:
 # copy it where xymonapi-connect looks, over a channel you already trust.
-mkdir -p ~/.config/xymon-api
-scp xymon.example.ch:/etc/xymon/tls/xymond.pem ~/.config/xymon-api/xymon-ca.pem
+mkdir -p ~/.config/xymonapi
+scp xymon.example.ch:/etc/xymon/tls/xymond.pem ~/.config/xymonapi/xymon-ca.pem
 
 cd xymon-plugins                         # the code: top README, Getting the code
 ./xymon-plugin install --tools xymonapi     # under ~/.local; PREFIX=... for elsewhere
@@ -229,7 +229,7 @@ xymonapi-connect https://xymon.example.ch   # the URL: as reached, above
 
 `xymonapi-connect` asks for your user and password once -- one of the API's
 [users](#users) -- to get this machine a token, kept in
-`~/.config/xymon-api/xymon.token`; the password is not kept. Run again, it
+`~/.config/xymonapi/xymon.token`; the password is not kept. Run again, it
 keeps a token that works, says when this machine's library and the API run
 different versions, and prints the settings a program reading the API
 needs. A second server gets a name of its own:
@@ -239,4 +239,4 @@ revokes all of theirs. Every detail is in
 [`xymonapi-connect.1`](xymonapi-connect.1).
 
 `./xymon-plugin remove --tools xymonapi` keeps the token: revoke it with `/tokens`, or delete
-`~/.config/xymon-api/xymon.token`.
+`~/.config/xymonapi/xymon.token`.

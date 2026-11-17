@@ -6,6 +6,7 @@ version: 0.1.0
 summary: one command that asks an AI agent -- Claude Code, Codex or opencode, headless -- a question about Xymon, with the MCP server as its only tool
 server-short: /ask: questions in words, through the API
 tools-short: xymonapi-agent: ask a question from a terminal
+data: $XDG_STATE_HOME/xymonapi-agent/
 requires: xymonapi-mcp >= 0.1.0 (beside it, with xymonapi's client); one of the agent CLIs, installed and logged in; python >= 3.9
 manual: xymonapi-agent.1
 

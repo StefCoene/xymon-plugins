@@ -31,9 +31,8 @@ to come.
   your own machine. What another program must find elsewhere -- a task, a
   setting, a manual page, a web server snippet -- is a link into that
   directory, or a file that program reads only when it exists. Every
-  other place a plugin may write is listed, once, in the Planned item "A
-  plugin writes only where this rule says": a place not listed there is
-  not a plugin's to write.
+  other place a plugin may write is listed, once, in S28: a place not
+  listed there is not a plugin's to write.
 - **Removing the directory removes the plugin.** Deleting an `ext/NAME`
   directory by hand is a valid way to take away the part installed there;
   the plugin is gone once every directory holding one of its parts has
@@ -343,6 +342,28 @@ the install, which says how to make it. `enable` refuses a plugin whose
 Python -- `XYMONAPI_PYTHON`, else that virtualenv, else `python3` -- lacks
 the modules it needs, naming what makes them, and `status` says so.
 
+**S28. A plugin writes only where this rule says.**
+An install writes a plugin's files under its directory, and outside it
+only: its task link, `etc/tasks.d/NAME` (S13); the link to its manual page
+in `MANDIR` (S20); its command in `$PREFIX/bin` (S4); its copy in the stage
+`/plugins` serves (S19); the virtualenv beside the plugins (S26); and its
+SELinux module (S23). The command itself writes, besides, only the
+installation used last (S25). While it runs, a plugin writes only: its
+sockets, in its directory of Xymon's runtime directory (S22); its log, in
+Xymon's log directory; and what its `PLUGIN` file declares -- a `data:`
+line for each directory it keeps for the administrator or the person,
+which outlives it (S10), and a `writes:` line for each file of another
+program that one of its commands changes, the file, then that command in
+parentheses: `writes: ~/.claude.json (xymonapi-mcp register)`. A `data:`
+path is `$XYMONVAR/NAME/`, `$XDG_CONFIG_HOME/NAME/`, `$XDG_CACHE_HOME/NAME/`
+or `$XDG_STATE_HOME/NAME/`, `NAME` being the plugin's own or that of a
+plugin it needs (S3); a `writes:` path names one file. A line that does
+neither is refused before anything is installed. An install, an update
+and a removal leave nothing anywhere else: the test compares the whole
+tree, and the person's home, before and after. What a plugin writes while
+it runs is declared here, and checked by its own tests with a scratch
+home.
+
 ### Getting the code
 
 **S11. `stable` is code every test passed.**
@@ -504,36 +525,10 @@ brings its test.
   `SUDO_USER`'s under `sudo`, else the account's that runs it; when it is gone, there is no default, and
   the command says so. `status --tools` run as root reads the tools of
   that person too.
-- **A plugin writes only where this rule says.** An install writes a
-  plugin's files under its directory, and outside it only: its task link,
-  `etc/tasks.d/NAME` (S13); the link to its manual page in `MANDIR` (S20);
-  its command in `$PREFIX/bin` (S4); its copy in the stage `/plugins`
-  serves (S19); the virtualenv beside the plugins (S26); and its SELinux
-  module (S23). The command itself writes, besides, only the installation
-  used last (S25). While it runs, a plugin writes only: its sockets, in its
-  directory of Xymon's runtime directory (S22); its log, in Xymon's log
-  directory; and what its `PLUGIN` file declares -- a `data:` line for each
-  directory it keeps for the administrator or the person, which outlives
-  it (S10), and a `writes:` line for each file of another program that one
-  of its commands changes, with the command that does. A `data:` path is
-  `$XYMONVAR/NAME/`, `$XDG_CONFIG_HOME/NAME/`, `$XDG_CACHE_HOME/NAME/` or
-  `$XDG_STATE_HOME/NAME/`, `NAME` being the plugin's own or that of a
-  plugin it needs (S3); a `writes:` path names one file. A line that does
-  neither is refused before anything is installed. An install, an update
-  and a removal leave nothing anywhere else: the test compares the whole
-  tree, and the person's home, before and after. The plugins declare:
-  `xymonapi`, `data: $XYMONVAR/xymonapi/` and `data:
-  $XDG_CONFIG_HOME/xymonapi/`; `xymonapi-rag`, `data:
-  $XDG_CACHE_HOME/xymonapi-rag/`; `xymonapi-mcp`, `writes: ~/.claude.json`
-  and `writes: ~/.codex/config.toml`, by `xymonapi-mcp register`;
-  `xymonapi-agent`, `data: $XDG_STATE_HOME/xymonapi-agent/`. With it, the
-  client of `xymonapi` keeps its URL, token and certificate in
-  `$XDG_CONFIG_HOME/xymonapi/`, its own name, in place of `xymon-api/`,
-  which is read no more: a change that breaks, with its line in
-  UPGRADING.
 - **An install records what it wrote.** The last step of an install or an
   update writes `MANIFEST` in the plugin's directory, beside `VERSION` and
-  `PLUGIN`: one line for each file it wrote there, with its cksum, and one
+  `PLUGIN`, its fields separated by tabs: one line for each file it wrote
+  there, with its cksum, and one
   for each thing it put outside -- the task link, the manual page's link,
   the command, the staged copy, the SELinux module -- with what it is: a
   link and its target, or a file and its cksum. The task file and the web
@@ -603,8 +598,6 @@ brings its test.
   - where the search index lies on a server: `$XDG_CACHE_HOME/xymonapi-rag/`
     today, which the item above allows as `data:`, or under `$XYMONVAR`,
     where Xymon keeps its own;
-  - the exact form of a `MANIFEST` line, and of a `writes:` line (a path,
-    then the command in parentheses, or otherwise);
   - how much of "while it runs" a test can check: plugin by plugin, its
     tests run with a scratch home and compared, and the rest declared;
   - how a client authenticates to its source: with the repository plugin

@@ -59,7 +59,7 @@ rc=0
 out=$(XDG_CONFIG_HOME="$work/cfg" HOME="$work" PATH="$path" XYMONAPI_PYTHON="" \
 	"$mcp_bin" register "$url" < "$work/in" 2>&1) || rc=$?
 [ "$rc" -eq 0 ] || fail "register failed with $rc: $out"
-tok=$work/cfg/xymon-api/xymon.token
+tok=$work/cfg/xymonapi/xymon.token
 assert_match '^xat_' "$(cat "$tok")" "register connects this machine: a token is kept"
 for c in claude codex; do
 	args=$(cat "$work/$c.args")

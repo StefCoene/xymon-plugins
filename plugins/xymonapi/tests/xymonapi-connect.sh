@@ -52,7 +52,7 @@ export XYMON="$XYMONCLIENT" XYMSRV="127.0.0.1:1" XYMONAPI_PASSWD="$work/htpasswd
 start_api
 url=http://127.0.0.1:$API_PORT
 cfg=$work/cfg
-tok=$cfg/xymon-api/xymon.token
+tok=$cfg/xymonapi/xymon.token
 
 # run [ARG...] -- xymonapi-connect URL with this test's configuration
 # directory; stdout in $work/out, stderr in $work/err, its status in rc.
@@ -64,19 +64,19 @@ run() {
 }
 
 # A password file an earlier setup kept: it goes.
-mkdir -p "$cfg/xymon-api"
-printf '%s\n' "$hard" > "$cfg/xymon-api/xymon.password"
+mkdir -p "$cfg/xymonapi"
+printf '%s\n' "$hard" > "$cfg/xymonapi/xymon.password"
 printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
 [ "$rc" -eq 0 ] || fail "xymonapi-connect failed with $rc: $(cat "$work/err")"
 assert_file_exists "$tok"
 assert_match '^xat_' "$(cat "$tok")" "it keeps a token, the API having taken carol's password as it is"
 assert_equal "-rw-------" "$(ls -l "$tok" | cut -c1-10)" "readable by this user alone"
 assert_not_contains "$hard" "$(cat "$tok")" "the token is not the password"
-[ -e "$cfg/xymon-api/xymon.password" ] && fail "the old password file was left"
+[ -e "$cfg/xymonapi/xymon.password" ] && fail "the old password file was left"
 assert_contains "XYMONAPI_URL=$url" "$(cat "$work/out")" "it prints the API's address"
 assert_contains "XYMONAPI_TOKEN_FILE=$tok" "$(cat "$work/out")" "and the token file"
 assert_not_contains "XYMONAPI_CA" "$(cat "$work/out")" "and no certificate, over http"
-assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "it keeps the URL beside the token"
+assert_equal "$url" "$(cat "$cfg/xymonapi/xymon.url")" "it keeps the URL beside the token"
 # A client given no setting reads the URL kept, and sends the token beside it.
 assert_contains '"version"' "$(XDG_CONFIG_HOME="$cfg" HOME="$work" env -u XYMONAPI_URL -u XYMONAPI_TOKEN_FILE -u XYMONAPI_TOKEN -u XYMONAPI_CA -u XYMONAPI_SOCKET -u XYMONRUNDIR -u XYMONSERVERLOGS \
 	"${XYMONAPI_PYTHON:-python3}" -c 'import sys, json; sys.path.insert(0, sys.argv[1]); import xymonapi_client as c; print(json.dumps({"health": c.api("/health")}))' \
@@ -102,11 +102,11 @@ assert_match '^xat_' "$(cat "$tok")" "a revoked token is replaced"
 
 # Kept for another server under the same name: the token is not sent here,
 # though it would work; the password is asked, and the URL kept is this one.
-echo "http://another.example:1986" > "$cfg/xymon-api/xymon.url"
+echo "http://another.example:1986" > "$cfg/xymonapi/xymon.url"
 printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
 [ "$rc" -eq 0 ] || fail "a run after another server's failed with $rc: $(cat "$work/err")"
 assert_contains "password for" "$(cat "$work/err")" "a token kept for another URL is not sent: the password is asked"
-assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "and the URL kept is this one"
+assert_equal "$url" "$(cat "$cfg/xymonapi/xymon.url")" "and the URL kept is this one"
 
 # A wrong password: said, and nothing written.
 curl -s -o /dev/null -u "carol:$hard" -X DELETE "$url/xymon/api/v1/tokens/${h%%.*}"
@@ -147,7 +147,7 @@ out=$(XDG_CONFIG_HOME="$work/cfg2" HOME="$work" XYMONAPI_USER=carol XYMONAPI_PYT
 assert_equal "130" "$rc" "Ctrl-C at the password prompt ends it ($out)"
 assert_contains "echo on" "$out" "with echo back on"
 assert_not_contains "Traceback" "$out" "and no traceback on the terminal"
-[ -e "$work/cfg2/xymon-api/xymon.token" ] && fail "a token was kept after Ctrl-C"
+[ -e "$work/cfg2/xymonapi/xymon.token" ] && fail "a token was kept after Ctrl-C"
 stop_process "$API_PID"; API_PID=""
 
 # A certificate this machine does not trust: said first, with where to copy
@@ -161,24 +161,24 @@ chmod 600 "$work/tls/xymond.key"
 XYMONAPI_PASSWD="" XYMONAPI_TLS_CERT="$work/tls/xymond.pem" XYMONAPI_TLS_KEY="$work/tls/xymond.key" start_api
 url=https://127.0.0.1:$API_PORT
 cfg=$work/cfg3
-mkdir -p "$cfg/xymon-api"
+mkdir -p "$cfg/xymonapi"
 printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
 assert_equal "1" "$rc" "an untrusted certificate stops it"
-assert_contains "copy the server's certificate, or the CA that signed it, to $cfg/xymon-api/xymon-ca.pem" "$(cat "$work/err")" "saying where to copy it"
+assert_contains "copy the server's certificate, or the CA that signed it, to $cfg/xymonapi/xymon-ca.pem" "$(cat "$work/err")" "saying where to copy it"
 assert_not_contains "password" "$(cat "$work/err")" "before a password is asked"
 assert_not_contains "user:" "$(cat "$work/err")" "or a user"
-cp "$work/tls/xymond.pem" "$cfg/xymon-api/xymon-ca.pem"
+cp "$work/tls/xymond.pem" "$cfg/xymonapi/xymon-ca.pem"
 # A token kept for another server under the same name: this API asks none,
 # so it goes, and is said to, rather than be sent here by a client later.
-printf 'xat_issuedbyanother\n' > "$cfg/xymon-api/xymon.token"
-echo "https://another.example:8443" > "$cfg/xymon-api/xymon.url"
+printf 'xat_issuedbyanother\n' > "$cfg/xymonapi/xymon.token"
+echo "https://another.example:8443" > "$cfg/xymonapi/xymon.url"
 run < /dev/null
 [ "$rc" -eq 0 ] || fail "with the certificate copied, it failed with $rc: $(cat "$work/err")"
-assert_contains "XYMONAPI_CA=$cfg/xymon-api/xymon-ca.pem" "$(cat "$work/out")" "the copied certificate is used, and printed"
+assert_contains "XYMONAPI_CA=$cfg/xymonapi/xymon-ca.pem" "$(cat "$work/out")" "the copied certificate is used, and printed"
 assert_not_contains "XYMONAPI_TOKEN_FILE" "$(cat "$work/out")" "an API that asks no password needs no token"
-[ -e "$cfg/xymon-api/xymon.token" ] && fail "a token kept for another URL was left beside this one's"
+[ -e "$cfg/xymonapi/xymon.token" ] && fail "a token kept for another URL was left beside this one's"
 assert_contains "the token kept for https://another.example:8443" "$(cat "$work/err")" "and its removal is said"
-assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "the URL kept is this one"
+assert_equal "$url" "$(cat "$cfg/xymonapi/xymon.url")" "the URL kept is this one"
 stop_process "$API_PID"; API_PID=""
 
 # An API that issues a token, then fails the /health that follows: the
@@ -203,26 +203,26 @@ PY
 fport=$(free_port)
 "${XYMONAPI_PYTHON:-python3}" "$work/issuer.py" "$fport" & API_PID=$!
 for _ in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null "http://127.0.0.1:$fport/" && break; sleep 0.3; done
-cfg=$work/cfg4; mkdir -p "$cfg/xymon-api"
-printf 'xat_issuedbyA\n' > "$cfg/xymon-api/xymon.token"
-echo "https://a.example:8443" > "$cfg/xymon-api/xymon.url"
+cfg=$work/cfg4; mkdir -p "$cfg/xymonapi"
+printf 'xat_issuedbyA\n' > "$cfg/xymonapi/xymon.token"
+echo "https://a.example:8443" > "$cfg/xymonapi/xymon.url"
 url=http://127.0.0.1:$fport
 printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
 assert_equal "1" "$rc" "a /health that fails after the token is issued fails the run"
-assert_equal "$url" "$(cat "$cfg/xymon-api/xymon.url")" "the URL kept is the one that issued the token"
-assert_equal "xat_issuedbyF" "$(cat "$cfg/xymon-api/xymon.token")" "beside its token"
+assert_equal "$url" "$(cat "$cfg/xymonapi/xymon.url")" "the URL kept is the one that issued the token"
+assert_equal "xat_issuedbyF" "$(cat "$cfg/xymonapi/xymon.token")" "beside its token"
 
 # Where the URL cannot be kept -- a directory in its place, which no
 # rename replaces, as root too -- the run fails, said so with no
 # traceback, and no token is left for a client to send anywhere.
-printf 'xat_issuedbyA\n' > "$cfg/xymon-api/xymon.token"
-rm -f "$cfg/xymon-api/xymon.url"; mkdir "$cfg/xymon-api/xymon.url"
+printf 'xat_issuedbyA\n' > "$cfg/xymonapi/xymon.token"
+rm -f "$cfg/xymonapi/xymon.url"; mkdir "$cfg/xymonapi/xymon.url"
 printf 'carol\n%s\n' "$hard" > "$work/in"; run < "$work/in"
 assert_equal "1" "$rc" "a token whose URL cannot be kept fails the run"
 assert_contains "cannot keep the token" "$(cat "$work/err")" "and says so"
 assert_not_contains "Traceback" "$(cat "$work/err")" "with no traceback"
-[ -e "$cfg/xymon-api/xymon.token" ] && fail "a token was left with no URL kept beside it"
-assert_equal "" "$(ls -A "$cfg/xymon-api" | grep '^\.')" "and nothing written aside is left"
+[ -e "$cfg/xymonapi/xymon.token" ] && fail "a token was left with no URL kept beside it"
+assert_equal "" "$(ls -A "$cfg/xymonapi" | grep '^\.')" "and nothing written aside is left"
 stop_process "$API_PID"; API_PID=""
 
 pass "xymonapi-connect gets this machine a token with a password typed once, keeps it while it works, says a wrong password, a version difference and an untrusted certificate, and stops cleanly on Ctrl-C"

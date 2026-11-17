@@ -72,7 +72,7 @@ For Claude Code, once, at user scope so every project has it:
 ```sh
 claude mcp add --scope user xymon \
   -e XYMONAPI_URL=https://xymon.example.ch \
-  -e XYMONAPI_TOKEN_FILE=$HOME/.config/xymon-api/xymon.token \
+  -e XYMONAPI_TOKEN_FILE=$HOME/.config/xymonapi/xymon.token \
   -- ~/.local/bin/xymonapi-mcp
 ```
 
@@ -91,7 +91,7 @@ Cursor in `~/.cursor/mcp.json`; VS Code reads `.vscode/mcp.json`, with
       "command": "/home/me/.local/bin/xymonapi-mcp",
       "env": {
         "XYMONAPI_URL": "https://xymon.example.ch",
-        "XYMONAPI_TOKEN_FILE": "/home/me/.config/xymon-api/xymon.token"
+        "XYMONAPI_TOKEN_FILE": "/home/me/.config/xymonapi/xymon.token"
       }
     }
   }

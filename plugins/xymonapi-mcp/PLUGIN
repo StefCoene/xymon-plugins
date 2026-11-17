@@ -6,6 +6,8 @@ version: 0.1.0
 summary: an MCP server that gives an AI client read-only tools over the Xymon API
 server-short: the MCP server, beside the API for /ask
 tools-short: the MCP server for your AI tools
+writes: ~/.claude.json (xymonapi-mcp register)
+writes: ~/.codex/config.toml (xymonapi-mcp register)
 requires: xymonapi >= 0.1.0 (its client beside it; the API over the network, XYMONAPI_URL), python >= 3.9
 manual: xymonapi-mcp.1
 
@@ -24,4 +26,4 @@ installed-tools:   server, unix: and the API's local socket, which install --ser
 uninstalled-tools: Uninstalled xymonapi-mcp. What register did besides, to undo by hand:
 uninstalled-tools:   claude mcp remove --scope user xymon; codex mcp remove xymon
 uninstalled-tools:   revoke this machine's token: curl -X DELETE -u USER https://SERVER/xymon/api/v1/tokens/$(hostname -s)
-uninstalled-tools:   rm ~/.config/xymon-api/xymon.token ~/.config/xymon-api/xymon.url
+uninstalled-tools:   rm ~/.config/xymonapi/xymon.token ~/.config/xymonapi/xymon.url

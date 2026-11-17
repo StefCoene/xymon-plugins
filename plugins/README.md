@@ -27,7 +27,7 @@ A machine that will only read the API can take the code from the
 Xymon server once the plugins are installed there, at the versions it runs:
 
 ```sh
-curl --cacert ~/.config/xymon-api/xymon-ca.pem https://xymon.example.ch/xymon/api/v1/plugins | tar xz
+curl --cacert ~/.config/xymonapi/xymon-ca.pem https://xymon.example.ch/xymon/api/v1/plugins | tar xz
 ```
 
 The address is the API's URL as `xymonapi`'s README gives it for each way of

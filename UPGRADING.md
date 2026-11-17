@@ -5,6 +5,16 @@ its version, what breaks, and what to do. Every other change needs nothing
 but installing the new code (see each plugin's README). CI refuses a change
 that breaks the API's contract without a line here.
 
+## The client's directory becomes ~/.config/xymonapi, from xymonapi 6.0.0
+
+`xymonapi-connect` keeps the API's URL, its token and a certificate in
+`$XDG_CONFIG_HOME/xymonapi/`, the plugin's own name (SPEC, S28); it was
+`xymon-api/`, which is read no more. What to do: move the directory,
+`mv ~/.config/xymon-api ~/.config/xymonapi`, or run `xymonapi-connect URL`
+again, which asks your password once. An AI tool registered with
+`XYMONAPI_TOKEN_FILE` or `XYMONAPI_CA` under the old directory needs them
+renamed too, or `xymonapi-mcp register URL` again.
+
 ## install.sh becomes xymon-plugin, from November 2026
 
 The installer is `./xymon-plugin`, with a verb and the part it acts on:
