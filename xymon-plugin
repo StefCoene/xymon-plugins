@@ -72,8 +72,12 @@ ALL=
 SEL_SERVER=
 SEL_TOOLS=
 PREFIX_GIVEN=${PREFIX:+1}
-for a in "$@"; do
+XH_OPT=
+while [ $# -gt 0 ]; do
+	a=$1; shift
 	case $a in
+		--xymon-home=*) XH_OPT=${a#--xymon-home=} ;;
+		--xymon-home) [ $# -gt 0 ] || usage; XH_OPT=$1; shift ;;
 		--force) FORCE=1 ;;
 		--all) ALL=1 ;;
 		--server) SEL_SERVER=1 ;;
@@ -97,16 +101,29 @@ fi
 
 XYMONHOME=${XYMONHOME:-}
 DESTDIR=${DESTDIR:-}
+# What chose the installation, said before anything changes: --xymon-home,
+# which wins over XYMONHOME, XYMONHOME, or detection, confirmed.
+CHOSEN=
+if [ -n "$XH_OPT" ]; then
+	if [ -n "$XYMONHOME" ] && [ "$XYMONHOME" != "$XH_OPT" ]; then CHOSEN="named by --xymon-home, over XYMONHOME=$XYMONHOME"
+	else CHOSEN="named by --xymon-home"; fi
+	XYMONHOME=$XH_OPT
+elif [ -n "$XYMONHOME" ]; then
+	CHOSEN="named by XYMONHOME"
+fi
+MANDIR_GIVEN=${MANDIR:+1}
 # MANDIR, /usr/share/man by default, which macOS lets no one write: for a
 # Xymon that Homebrew installed, XYMONHOME under its prefix, Homebrew's
 # share/man, where man looks.
-if [ -z "${MANDIR:-}" ]; then
+mandir() {
+	[ -z "$MANDIR_GIVEN" ] || return 0
 	MANDIR=/usr/share/man
 	bp=$(brew --prefix 2>/dev/null) || bp=
 	if [ -n "$bp" ]; then
 		case $XYMONHOME in "$bp"/*) MANDIR=$bp/share/man ;; esac
 	fi
-fi
+}
+mandir
 PREFIX=${PREFIX:-$HOME/.local}
 # PYTHON given is also the one an install makes the virtualenv from, in
 # place of its search for one.
@@ -147,16 +164,21 @@ inside() {
 	printf '%s\n' "$DESTDIR${cur:-/}"
 }
 
-EXTROOT=$(inside "$XYMONHOME/ext") || exit 1
-ETC=$(inside "$XYMONHOME/etc") || exit 1
-TASKDIR=$(inside "$XYMONHOME/etc/tasks.d") || exit 1
+# server_paths -- what the server's part uses, from XYMONHOME: again once
+# the installation is chosen.
+server_paths() {
+	EXTROOT=$(inside "$XYMONHOME/ext") || exit 1
+	ETC=$(inside "$XYMONHOME/etc") || exit 1
+	TASKDIR=$(inside "$XYMONHOME/etc/tasks.d") || exit 1
+	# What other machines install from, which the API serves at /plugins:
+	# each plugin installed on the server stages its directory here, as in
+	# the repository, beside this script and LICENSE.
+	DIST=$EXTROOT/xymon-plugins-dist
+}
+server_paths
 TOOLSROOT=$(inside "$PREFIX/libexec/xymon-plugins") || exit 1
 BIN=$(inside "$PREFIX/bin") || exit 1
 TOOLSMAN1=$(inside "$PREFIX/share/man/man1") || exit 1
-# What other machines install from, which the API serves at /plugins: each
-# plugin installed on the server stages its directory here, as in the
-# repository, beside this script and LICENSE.
-DIST=$EXTROOT/xymon-plugins-dist
 
 # field PLUGIN KEY -- the value of KEY in the plugin's PLUGIN file, one line
 # for each time the key appears; nothing for a plugin gone from the checkout.
@@ -315,25 +337,127 @@ marks() {
 	esac
 }
 
-# xymon_trees -- the Xymon trees on this machine, "KIND DIR" each: those
-# XYMON_PLUGINS_TREES names, colon-separated, and the packages' usual paths,
-# Homebrew's among them where brew is installed.
-# It only tells what is here: nothing is chosen from it.
-# ponytail: fixed paths only; a running xymonlaunch's tree when a relocated
-# server needs finding, which ps cannot tell portably.
+# canon DIR -- DIR with every link resolved, or nothing when it is no
+# directory: one tree reached by two paths, as Homebrew's opt/ and Cellar/,
+# is one tree.
+canon() { (cd "$1" 2>/dev/null && pwd -P); }
+
+# client_of SERVER -- the client tree SERVER's xymonserver.cfg names as its
+# XYMONCLIENTHOME, resolved, or nothing when it names none or a variable.
+client_of() {
+	c=$(sed -n 's/^[[:space:]]*XYMONCLIENTHOME[[:space:]]*=[[:space:]]*//p' "$1/etc/xymonserver.cfg" 2>/dev/null \
+		| tail -n 1 | sed -e 's/[[:space:]]*#.*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")
+	case $c in ''|*'$'*) return 0 ;; esac
+	canon "$c"
+}
+
+# xymon_trees -- the Xymon installations on this machine, "KIND DIR" each:
+# those XYMON_PLUGINS_TREES names, colon-separated, the packages' usual
+# paths, Homebrew's among them where brew is installed, the trees of a
+# running xymonlaunch, and the xymon user's home -- not the current
+# directory; with XYMON_PLUGINS_TREES_ONLY set, those it names alone. Each is told once, by its resolved path, shown as found; a
+# client tree a server found names as its own is part of that server, not
+# told apart. It only tells what is here: nothing is chosen from it.
 xymon_trees() {
 	{
 		printf '%s\n' "${XYMON_PLUGINS_TREES:-}" | tr ':' '\n'
+		# XYMON_PLUGINS_TREES_ONLY, for the tests: the trees named above, and
+		# none of this machine's.
+		[ -z "${XYMON_PLUGINS_TREES_ONLY:-}" ] || exit 0
 		for t in /usr/lib/xymon/server /usr/lib/xymon/client /usr/local/xymon/server \
 			/usr/local/xymon/client /home/xymon/server /home/xymon/client; do
 			printf '%s\n' "$t"
 		done
 		bp=$(brew --prefix 2>/dev/null) && [ -n "$bp" ] && printf '%s\n' "$bp/opt/xymon-server/server"
-	} | sort -u | while IFS= read -r t; do
+		# A running xymonlaunch: the tree its program, or its --config,
+		# lies in.
+		ps -A -o args= 2>/dev/null | awk '/xymonlaunch/ {
+			if ($1 ~ /\/bin\/xymonlaunch$/) { d = $1; sub(/\/bin\/xymonlaunch$/, "", d); print d }
+			for (i = 2; i <= NF; i++) if ($i ~ /^--config=/) { c = substr($i, 10); sub(/\/etc\/[^\/]*$/, "", c); print c }
+		}'
+		eval "xh=~xymon" 2>/dev/null
+		case $xh in "~xymon"|'') ;; *) printf '%s\n%s\n%s\n' "$xh" "$xh/server" "$xh/client" ;; esac
+	} | while IFS= read -r t; do
 		[ -n "$t" ] || continue
+		c=$(canon "$t") || continue
+		[ -n "$c" ] || continue
 		k=$(marks "$t")
-		case $k in server|client) printf '%s %s\n' "$k" "$t" ;; esac
-	done
+		case $k in server|client) printf '%s %s %s\n' "$c" "$k" "$t" ;; esac
+	done | awk '!seen[$1]++ { print }' > "${TMPDIR:-/tmp}/xymon-plugin-trees.$$"
+	owned=
+	while read -r c k t; do
+		[ "$k" = server ] || continue
+		o=$(client_of "$t"); [ -z "$o" ] || owned="$owned $o "
+	done < "${TMPDIR:-/tmp}/xymon-plugin-trees.$$"
+	while read -r c k t; do
+		case $owned in *" $c "*) continue ;; esac
+		printf '%s %s\n' "$k" "$t"
+	done < "${TMPDIR:-/tmp}/xymon-plugin-trees.$$"
+	rm -f "${TMPDIR:-/tmp}/xymon-plugin-trees.$$"
+}
+
+# person_conf -- the directory of the person who typed the command:
+# SUDO_USER's under sudo, else the account's that runs it.
+person_conf() {
+	if [ -n "$ROOTUSER" ] && [ -n "${SUDO_USER:-}" ]; then
+		case $SUDO_USER in *[!A-Za-z0-9._-]*|-*) return 1 ;; esac
+		eval "h=~$SUDO_USER"; printf '%s\n' "$h/.config/xymon-plugin"
+	else
+		printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/xymon-plugin"
+	fi
+}
+
+# choose_tree -- XYMONHOME, from the installations detection finds, on a
+# terminal: the one found proposed, Enter for yes; several listed, the one
+# used last as the default, or none, said when it is gone. Off a terminal,
+# or with none found, refused, the trees found named. The one chosen is
+# remembered as the one used last -- not under sudo, which only reads it.
+choose_tree() {
+	trees=$(xymon_trees)
+	found=$(printf '%s\n' "$trees" | sed -n 's/^\([a-z]*\) \(.*\)/  \2, a Xymon \1/p')
+	servers=$(printf '%s\n' "$trees" | sed -n 's/^server //p')
+	if ! { [ -t 0 ] && [ -t 1 ]; } || [ -z "$servers" ]; then
+		die "XYMONHOME is not set: XYMONHOME=<the Xymon server directory> ./xymon-plugin $VERB --server [PLUGIN...]${found:+
+Xymon trees found here, none chosen:
+$found}"
+	fi
+	n=$(printf '%s\n' "$servers" | wc -l | tr -d ' ')
+	if [ "$n" -eq 1 ]; then
+		printf 'Xymon server: %s (detected). Use it? [Y/n] ' "$servers"
+		read -r ans || ans=n
+		case $ans in [Nn]*) die "no installation chosen: nothing done" ;; esac
+		XYMONHOME=$servers
+	else
+		conf=$(person_conf) || conf=
+		last=; [ -z "$conf" ] || last=$(cat "$conf/installation-used-last" 2>/dev/null) || last=
+		def=; i=0
+		echo "Xymon servers here:"
+		while IFS= read -r t; do
+			i=$((i + 1)); echo "  $i) $t"
+			[ -n "$last" ] && [ "$(canon "$t")" = "$(canon "$last" 2>/dev/null)" ] && def=$i
+		done <<EOF2
+$servers
+EOF2
+		[ -z "$last" ] || [ -n "$def" ] || echo "The one used last, $last, is gone."
+		printf 'Which one? [%s] ' "${def:-1-$n}"
+		read -r ans || ans=
+		[ -n "$ans" ] || ans=$def
+		case $ans in ''|*[!0-9]*) die "no installation chosen: nothing done" ;; esac
+		[ "$ans" -ge 1 ] && [ "$ans" -le "$n" ] || die "no installation $ans: nothing done"
+		XYMONHOME=$(printf '%s\n' "$servers" | sed -n "${ans}p")
+	fi
+	CHOSEN="detected, confirmed"
+	mandir
+	server_paths
+}
+
+# remember_tree -- XYMONHOME as the one used last, for the person who typed
+# the command; not under sudo, which reads it only.
+remember_tree() {
+	[ -z "$DESTDIR" ] || return 0
+	{ [ -n "$ROOTUSER" ] && [ -n "${SUDO_USER:-}" ]; } && return 0
+	conf=$(person_conf) || return 0
+	mkdir -p "$conf" 2>/dev/null && printf '%s\n' "$XYMONHOME" > "$conf/installation-used-last" 2>/dev/null || :
 }
 
 # need_home -- the server's part goes in the tree XYMONHOME names, and only
@@ -343,19 +467,31 @@ xymon_trees() {
 # the host's included.
 need_home() {
 	if [ -z "$XYMONHOME" ]; then
-		found=
-		[ -n "$DESTDIR" ] || found=$(xymon_trees | sed 's/^\([a-z]*\) \(.*\)/  \2, a Xymon \1/')
-		die "XYMONHOME is not set: XYMONHOME=<the Xymon server directory> ./xymon-plugin $VERB --server [PLUGIN...]${found:+
-Xymon trees found here, none chosen:
-$found}"
+		[ -z "$DESTDIR" ] || die "XYMONHOME is not set: under DESTDIR it names the installation, XYMONHOME=<the Xymon server directory> ./xymon-plugin $VERB --server [PLUGIN...]"
+		choose_tree
 	fi
 	[ -z "$DESTDIR" ] || return 0
 	set -- $(marks "$XYMONHOME")
 	case $1 in
-		client) die "$XYMONHOME is a Xymon client's tree ($CLIENT_MARKS), not a server's: the server's part of a plugin goes in a server's tree" ;;
+		client)
+			# A server's own client tree: that server named, and what to type.
+			me=$(canon "$XYMONHOME"); srv=
+			s2=$(canon "$XYMONHOME/../server") && [ "$(marks "$s2")" = server ] && [ "$(client_of "$s2")" = "$me" ] && srv=$s2
+			if [ -z "$srv" ]; then
+				srv=$(xymon_trees | sed -n 's/^server //p' | while IFS= read -r t; do
+					[ "$(client_of "$t")" = "$me" ] && { printf '%s\n' "$t"; break; }
+				done)
+			fi
+			[ -z "$srv" ] || die "$XYMONHOME is the client tree of the Xymon server $srv: name the server, ./xymon-plugin $VERB --xymon-home $srv --server; its client part, --client, comes once a plugin has one"
+			die "$XYMONHOME is a Xymon client's tree ($CLIENT_MARKS), not a server's: the server's part of a plugin goes in a server's tree" ;;
 		some) shift; die "$XYMONHOME is not a whole Xymon server's tree: it has $*, and a server's has $SERVER_MARKS" ;;
 		none) die "$XYMONHOME is no Xymon server's tree: none of $SERVER_MARKS is there; to stage one for a package, set DESTDIR" ;;
 	esac
+	# Before anything changes: the target, the part, and what chose them.
+	if [ "$VERB" != status ]; then
+		echo "Target: $XYMONHOME ($CHOSEN), part: server"
+		remember_tree
+	fi
 }
 
 # fresh DIR -- DIR, emptied: an install replaces a plugin's directory as a
@@ -1144,6 +1280,9 @@ case $VERB in enable|disable) [ "$PART" != tools ] || die "the tools have no tas
 if [ "$PART" = tools ] && [ -n "$ROOTUSER" ] && [ "$VERB" != status ] && [ -z "$DESTDIR" ] && [ -z "$PREFIX_GIVEN" ]; then
 	die "the tools go in a person's own directory, not root's: run this without sudo, or give PREFIX= or DESTDIR="
 fi
+# The installation, named or chosen, once, before anything is looked at in
+# it; status reads it apart.
+if [ "$PART" = server ] && [ "$VERB" != status ]; then need_home; fi
 if [ "$PART" = server ]; then PARTROOT=$EXTROOT; else PARTROOT=$TOOLSROOT; fi
 
 # The plugins named, each checked; or, for install and remove, --all, which
@@ -1172,7 +1311,6 @@ case $VERB in
 			die "$n is installed already ($v): ./xymon-plugin update --$PART $n"
 		done
 		if [ "$PART" = server ]; then
-			need_home
 			for n in $LIST; do [ -n "$(field "$n" server-files)" ] || [ -n "$NAMES" ] || continue; xymon_ok "$n"; done
 			reads_d
 			for n in $LIST; do [ -n "$(field "$n" server-files)" ] || [ -n "$NAMES" ] || continue; install_server "$n"; done
@@ -1189,7 +1327,6 @@ case $VERB in
 			[ -n "$LIST" ] || die "nothing is installed in $PARTROOT to update"
 		fi
 		if [ "$PART" = server ]; then
-			need_home
 			for n in $LIST; do xymon_ok "$n"; done
 			reads_d
 			for n in $LIST; do install_server "$n"; done
@@ -1197,7 +1334,6 @@ case $VERB in
 			for n in $LIST; do install_tools "$n"; done
 		fi ;;
 	enable|disable)
-		need_home
 		# A plugin named with no task is refused; with none named, those
 		# with no task are passed over.
 		for n in $NAMES; do
@@ -1206,7 +1342,19 @@ case $VERB in
 		[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
 		for n in $(installed_tasks); do "$VERB" "$n"; done ;;
 	status)
-		if [ "$PART" != tools ] && { [ "$PART" = server ] || [ -n "$XYMONHOME" ]; }; then
+		# None named: every installation found is listed, and nothing is
+		# asked, on a terminal as off one.
+		if [ "$PART" != tools ] && [ -z "$XYMONHOME" ] && [ -z "$DESTDIR" ]; then
+			xymon_trees | sed -n 's/^server //p' > "${TMPDIR:-/tmp}/xymon-plugin-status.$$"
+			while IFS= read -r t; do
+				echo "Xymon server $t:"
+				XYMONHOME=$t; server_paths
+				L=$LIST; [ -n "$NAMES" ] || L=$(with_installed "$EXTROOT")
+				for n in $L; do l=$(status server "$EXTROOT" "$n"); [ -z "$l" ] || echo "  $l"; done
+			done < "${TMPDIR:-/tmp}/xymon-plugin-status.$$"
+			rm -f "${TMPDIR:-/tmp}/xymon-plugin-status.$$"
+			XYMONHOME=
+		elif [ "$PART" != tools ]; then
 			need_home
 			L=$LIST; [ -n "$NAMES" ] || L=$(with_installed "$EXTROOT")
 			for n in $L; do status server "$EXTROOT" "$n"; done
@@ -1217,7 +1365,6 @@ case $VERB in
 		fi ;;
 	remove)
 		if [ "$PART" = server ]; then
-			need_home
 			# The stage served at /plugins, pruned first, as an install
 			# does: a link there would take the removal elsewhere.
 			prune_dist
@@ -1233,6 +1380,5 @@ case $VERB in
 			fi
 		fi ;;
 	venv)
-		[ "$PART" = tools ] || need_home
 		venv "$PARTROOT" ;;
 esac
