@@ -2,7 +2,7 @@
 
 The plugins of [xymon-plugins](../README.md): each a directory here with a
 `PLUGIN` file, a README, a manual page, tests and its code, installed with
-[`install.sh`](../install.sh) at the repository's top. What a plugin is, and
+[`xymon-plugin`](../xymon-plugin) at the repository's top. What a plugin is, and
 what installing one guarantees, are in [`SPEC.md`](../SPEC.md); the
 conventions they share, in the [top README](../README.md).
 
@@ -39,24 +39,28 @@ fetched without checking the certificate could be anyone's.
 
 ## Installing a plugin
 
-Every plugin installs the same way, with `./install.sh` at the
+Every plugin installs the same way, with `./xymon-plugin` at the
 repository's top -- a POSIX shell script, needing no `make` -- and each
-README says only what is particular to it. A plugin has up to two sides, the
+README says only what is particular to it. A plugin has up to two parts, the
 Xymon server's and your own machine's ([Where things run](../README.md#where-things-run)),
-and you install the one the machine plays. The server actions are also
-spelt without `-server`, as they were before the tools had a name of their
-own; `install-client` is refused, naming `install-tools`: a client here is
-Xymon's, on a monitored host, and nothing installs one there yet.
+and you install the one the machine plays: a verb, then `--server` or
+`--tools`, which goes alone. Without one, on a terminal, the server part is
+meant, and said; in a script, name it. `--client` is refused: a client here
+is Xymon's, on a monitored host, and no plugin has a part there yet.
 
 | side | where, as whom | command | puts |
 |---|---|---|---|
-| the Xymon server | the Xymon server, as the user that may write its directory, usually root | `XYMONHOME=/usr/lib/xymon/server ./install.sh install-server NAME` | the code in `$XYMONHOME/ext/NAME/`, its task in `ext/NAME/tasks.cfg`, off until enabled, its manual page under `MANDIR` (`/usr/share/man`, Homebrew's `share/man` for a Xymon it installed) |
-| your own machine | any machine that reads the API, the server included, as yourself | `./install.sh install-tools NAME` | the code in `$PREFIX/libexec/xymon-plugins/NAME/`, its command in `$PREFIX/bin`, its manual page in `$PREFIX/share/man/man1`; `PREFIX` is `~/.local` |
+| the Xymon server | the Xymon server, as the user that may write its directory, usually root | `XYMONHOME=/usr/lib/xymon/server ./xymon-plugin install --server NAME` | the code in `$XYMONHOME/ext/NAME/`, its task in `ext/NAME/tasks.cfg`, off until enabled, its manual page under `MANDIR` (`/usr/share/man`, Homebrew's `share/man` for a Xymon it installed) |
+| your own machine | any machine that reads the API, the server included, as yourself | `./xymon-plugin install --tools NAME` | the code in `$PREFIX/libexec/xymon-plugins/NAME/`, its command in `$PREFIX/bin`, its manual page in `$PREFIX/share/man/man1`; `PREFIX` is `~/.local` |
 
 A plugin that needs a newer Xymon than the server's, by the `xymon:` line of
 its `PLUGIN`, is refused, naming both versions; `--force` installs it
 anyway. A plugin that needs another installs it first, so one command is enough,
-and with no `NAME` the same two commands install every plugin of a side.
+and `--all` in place of `NAME` installs every plugin of a part. `install`
+refuses a plugin installed already: `update` replaces it. A plugin needed
+that is installed already, and one `--all` finds installed, are left as
+they are, said. Run as root, the tools are refused unless `PREFIX` or
+`DESTDIR` is given: they would go in root's home.
 Settings are taken from the environment or as `NAME=value` arguments. `DESTDIR` stages either side for a package. The server install also
 copies each plugin into what the API serves at `/plugins`, for other
 machines to install from.
@@ -74,38 +78,39 @@ interpreter and fetching nothing. When no Python has them, or the virtualenv
 there lacks some, the install run from a terminal offers to make or complete
 it, installing the modules from PyPI -- the one virtualenv of that side,
 with the modules of every plugin installed there; without a terminal, or
-answered no, it says so, and `XYMONHOME=... ./install.sh venv-server PYTHON=...` on the
-server, or `./install.sh venv-tools PYTHON=...` elsewhere, does it later. The
+answered no, it says so, and `XYMONHOME=... ./xymon-plugin venv --server PYTHON=...` on the
+server, or `./xymon-plugin venv --tools PYTHON=...` elsewhere, does it later. The
 launchers run with `XYMONAPI_PYTHON` when it is set, else with that
 virtualenv, else with the `python3` on PATH, asking nothing; a command that
 then needs a module it lacks says which, and what installs it.
 
 **Enabling.** A server task is installed off, so that installing changes
-nothing until `XYMONHOME=... ./install.sh enable-server NAME`, which links
+nothing until `XYMONHOME=... ./xymon-plugin enable --server NAME`, which links
 `etc/tasks.d/NAME` to the task file, `ext/NAME/tasks.cfg`; xymonlaunch
-notices and starts it within half a minute. `disable-server NAME` removes the
-link, and xymonlaunch stops the task. A later install keeps the task file as
+notices and starts it within half a minute. `disable --server NAME` removes the
+link, and xymonlaunch stops the task. An update keeps the task file as
 you left it, and whether it is on; where an editor replaced the link by a
 file of its own, as `sed -i` does, it moves that file into `ext/NAME` and
 puts the link back. A task an older install wrote with a
 `DISABLED` line is off, and that line is taken out.
 
-**Updating.** `XYMONHOME=... ./install.sh status-server`, or
-`./install.sh status-tools`, says what is installed, at which version,
-whether its task is on, and whether the checkout it runs from is newer. Run
-the same install again, from an updated checkout or a fresh `/plugins`
-download. The server install replaces the plugin's code and
+**Updating.** `XYMONHOME=... ./xymon-plugin status --server`, or
+`./xymon-plugin status --tools`, says what is installed, at which version,
+whether its task is on, and whether the checkout it runs from is newer.
+`update --server`, or `update --tools`, from an updated checkout or a fresh
+`/plugins` download, updates what is installed, or the plugins named; it
+refuses one that is not installed. It replaces the plugin's code and
 keeps your task file, snippets and settings. A task that runs on keeps the
-code it loaded: the API's install stops the API, saying so, and xymonlaunch
+code it loaded: the API's update stops the API, saying so, and xymonlaunch
 starts the new; a task that runs from time to time, as the index, takes the
 new code at its next run.
 
-**Uninstalling.** `XYMONHOME=... ./install.sh uninstall-server NAME` or
-`./install.sh uninstall-tools NAME` removes that plugin alone, and refuses
-while another installed plugin needs it, naming it; with no `NAME`, every
-plugin of the side and the virtualenv beside them. Each says what it keeps.
+**Uninstalling.** `XYMONHOME=... ./xymon-plugin remove --server NAME` or
+`./xymon-plugin remove --tools NAME` removes that plugin alone, and refuses
+while another installed plugin needs it, naming it; `--all` in place of
+`NAME` removes every plugin of the part and the virtualenv beside them. Each says what it keeps.
 On the server, removing `$XYMONHOME/ext/NAME` by hand also removes the
 plugin's task: xymonlaunch skips the link in `tasks.d` that now points
 nowhere and stops the task at its next reload, within half a minute, with
 nothing in its log. The link, the manual page and the copy served at
-`/plugins` stay until `uninstall-server NAME`.
+`/plugins` stay until `remove --server NAME`.

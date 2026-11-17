@@ -57,7 +57,7 @@ without it, checked by reverting what makes it true.
   | a plugin's `README.md` | whoever installs, packages or uses that plugin, with the repository open | how to install it and use it |
   | a plugin's manual page | an admin, or a laptop user, with the plugin installed | its behaviour and every setting |
   | `plugins/xymonapi/openapi.yaml` | whoever writes a client or another implementation of the API | the contract: each path's answers, the closed list of errors, the numbered rules |
-  | a plugin's `PLUGIN` file | `install.sh`, and whoever packages it | its name, side, version, what it needs, and what it installs |
+  | a plugin's `PLUGIN` file | `xymon-plugin`, and whoever packages it | its name, side, version, what it needs, and what it installs |
   | `SPEC.md` | whoever changes the installer or adds a plugin | the plugin model's numbered rules, each enforced by a test |
 
 ## What only this repository has
@@ -153,7 +153,7 @@ shared by several tests are under `tests/lib/`. Each test says at its top
 what it checks and what it needs.
 Unlike Xymon's, a test here may use Python: a helper written in Python goes
 under `tests/lib/`, as `fake-llm.py` and `ctrl-c.py` do. Otherwise the test
-scripts, and `install.sh`, keep to Xymon's portability rules -- bash 3.2, portable tool flags,
+scripts, and `xymon-plugin`, keep to Xymon's portability rules -- bash 3.2, portable tool flags,
 no early-exit pipes -- which `tests/compat/xymonapi-portability.sh` checks
 with Xymon's own check, read from `XYMON_SRC`. A test that cannot
 run where something it needs is missing skips, with exit 77, and says what.

@@ -87,7 +87,7 @@ says whose:
 ## On the Xymon server
 
 ```sh
-XYMONHOME=/usr/lib/xymon/server ./install.sh install-server xymonapi
+XYMONHOME=/usr/lib/xymon/server ./xymon-plugin install --server xymonapi
 ```
 
 Besides the code, the task and the manual page, which every plugin
@@ -99,7 +99,7 @@ Xymon's own install links `$XYMONHOME/ext` and `$XYMONHOME/etc` to wherever
 those really are -- `/etc/xymon` on many installations -- so the files land
 there; with `DESTDIR`, the staged directories are plain ones.
 
-Then turn it on, `XYMONHOME=/usr/lib/xymon/server ./install.sh enable-server xymonapi`, and check:
+Then turn it on, `XYMONHOME=/usr/lib/xymon/server ./xymon-plugin enable --server xymonapi`, and check:
 
 ```sh
 curl http://127.0.0.1:1986/xymon/api/v1/health              # the port: 401 means it runs and asks for a user (https:// and --cacert where it speaks HTTPS)
@@ -112,16 +112,16 @@ the server itself and asks none: its permissions let the Xymon user and its
 group in, and nobody else. The plugins' commands take it by default
 there (`xymonapi.8`, `XYMONAPI_SOCKET`).
 
-Updating: install again. The install stops the running API, which would go
+Updating: `XYMONHOME=... ./xymon-plugin update --server xymonapi`. It stops the running API, which would go
 on with the code it loaded, and says so; xymonlaunch starts the new.
-`./install.sh uninstall-server xymonapi` removes the snippets with the rest of
+`./xymon-plugin remove --server xymonapi` removes the snippets with the rest of
 `ext/xymonapi`, which the web server's optional include then skips, and keeps
 the tokens file, `$XYMONAPI_TOKENS`.
 
 ## Asking in words: /ask
 
 With [`xymonapi-agent`](../xymonapi-agent/README.md) installed beside the
-API (`./install.sh install-server xymonapi-agent`, which brings `xymonapi-mcp`), the API
+API (`./xymon-plugin install --server xymonapi-agent`, which brings `xymonapi-mcp`), the API
 can answer a question in words: `POST /ask` with `{"question": "..."}`
 runs the agent as the Xymon user, with an agent CLI that user has
 installed and logged in -- Claude Code, Codex or opencode -- and the Xymon
@@ -223,7 +223,7 @@ mkdir -p ~/.config/xymon-api
 scp xymon.example.ch:/etc/xymon/tls/xymond.pem ~/.config/xymon-api/xymon-ca.pem
 
 cd xymon-plugins                         # the code: top README, Getting the code
-./install.sh install-tools xymonapi     # under ~/.local; PREFIX=... for elsewhere
+./xymon-plugin install --tools xymonapi     # under ~/.local; PREFIX=... for elsewhere
 xymonapi-connect https://xymon.example.ch   # the URL: as reached, above
 ```
 
@@ -238,5 +238,5 @@ machines and revokes one, and removing a user from the password file
 revokes all of theirs. Every detail is in
 [`xymonapi-connect.1`](xymonapi-connect.1).
 
-`./install.sh uninstall-tools xymonapi` keeps the token: revoke it with `/tokens`, or delete
+`./xymon-plugin remove --tools xymonapi` keeps the token: revoke it with `/tokens`, or delete
 `~/.config/xymon-api/xymon.token`.

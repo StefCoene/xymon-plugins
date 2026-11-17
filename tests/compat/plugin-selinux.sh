@@ -29,8 +29,9 @@ export PATH="$work/bin:$PATH"
 
 home=$work/server
 server_tree "$home"
-run() { # ACTION LOG [ROOT] -- install.sh ACTION-server xymonapi
-	"${3:-$ROOT}/install.sh" "$1-server" xymonapi XYMONHOME="$home" MANDIR="$work/man" </dev/null >"$work/$2.log" 2>&1 \
+run() { # ACTION LOG [ROOT] -- xymon-plugin ACTION-server xymonapi
+	a=$1; [ "$a" = uninstall ] && a=remove
+	"${3:-$ROOT}/xymon-plugin" "$a" --server xymonapi XYMONHOME="$home" MANDIR="$work/man" </dev/null >"$work/$2.log" 2>&1 \
 		|| fail "$1-server ($2) failed: $(tail -n 5 "$work/$2.log")"
 }
 log() { cat "$work/semodule.log" 2>/dev/null || true; }
@@ -58,7 +59,7 @@ run uninstall inactive2
 # Under DESTDIR: nothing loaded, and what to run said.
 : > "$work/semodule.log"
 echo 0 > "$work/enabled"
-"$ROOT/install.sh" install-server xymonapi XYMONHOME=/srv/xymon DESTDIR="$work/stage" MANDIR=/usr/share/man </dev/null >"$work/stage.log" 2>&1 \
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME=/srv/xymon DESTDIR="$work/stage" MANDIR=/usr/share/man </dev/null >"$work/stage.log" 2>&1 \
 	|| fail "install-server under DESTDIR failed: $(tail -n 5 "$work/stage.log")"
 assert_equal "" "$(log)" "[S23] under DESTDIR nothing is loaded"
 assert_contains "semodule -i /srv/xymon/ext/xymonapi/xymonapi.cil" "$(cat "$work/stage.log")" "[S23] and the install says what to run on the installed system"
@@ -67,11 +68,11 @@ assert_contains "semodule -i /srv/xymon/ext/xymonapi/xymonapi.cil" "$(cat "$work
 # of the checkout plays that version.
 next=$work/next
 mkdir -p "$next"
-cp -R "$ROOT/install.sh" "$ROOT/LICENSE" "$ROOT/plugins" "$next/"
+cp -R "$ROOT/xymon-plugin" "$ROOT/LICENSE" "$ROOT/plugins" "$next/"
 sed '/^selinux: /d' "$next/plugins/xymonapi/PLUGIN" > "$work/PLUGIN" && mv "$work/PLUGIN" "$next/plugins/xymonapi/PLUGIN"
 run install again
 : > "$work/semodule.log"
-run install next "$next"
+run update next "$next"
 assert_equal "-r xymonapi" "$(log)" "[S23] an update to a version without a module removes the one loaded"
 
 pass "a plugin's SELinux module is loaded where SELinux is active, its boolean named, removed by its name with the plugin or by an update without it, and never loaded where SELinux is off or under DESTDIR"

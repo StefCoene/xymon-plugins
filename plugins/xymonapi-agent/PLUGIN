@@ -1,13 +1,13 @@
 # What this plugin is, for the index in README.md and for whoever installs
 # it alone. One key per line, a key repeated for each line of a message;
-# ./install.sh at the repository's top installs it from the lines below.
+# ./xymon-plugin at the repository's top installs it from the lines below.
 name: xymonapi-agent
 version: 0.1.0
 summary: one command that asks an AI agent -- Claude Code, Codex or opencode, headless -- a question about Xymon, with the MCP server as its only tool
 requires: xymonapi-mcp >= 0.1.0 (beside it, with xymonapi's client); one of the agent CLIs, installed and logged in; python >= 3.9
 manual: xymonapi-agent.1
 
-# How ./install.sh installs it: see xymonapi's PLUGIN file.
+# How ./xymon-plugin installs it: see xymonapi's PLUGIN file.
 server-needs: xymonapi-mcp
 tools-needs: xymonapi-mcp
 server-files: xymonagent.py xymonapi-agent.sh

@@ -1,13 +1,13 @@
 # What this plugin is, for the index in README.md and for whoever installs
 # it alone. One key per line, a key repeated for each line of a message;
-# ./install.sh at the repository's top installs it from the lines below.
+# ./xymon-plugin at the repository's top installs it from the lines below.
 name: xymonapi-mcp
 version: 0.1.0
 summary: an MCP server that gives an AI client read-only tools over the Xymon API
 requires: xymonapi >= 0.1.0 (its client beside it; the API over the network, XYMONAPI_URL), python >= 3.9
 manual: xymonapi-mcp.1
 
-# How ./install.sh installs it: see xymonapi's PLUGIN file.
+# How ./xymon-plugin installs it: see xymonapi's PLUGIN file.
 server-needs: xymonapi
 tools-needs: xymonapi
 server-files: server.py xymonapi-mcp.sh
@@ -18,7 +18,7 @@ tools-manual: xymonapi-mcp.1
 command: xymonapi-mcp xymonapi-mcp.sh
 executable: xymonapi-mcp.sh
 installed-tools: Next, once: xymonapi-mcp register URL -- the API's address as this machine reaches it, or, on the Xymon
-installed-tools:   server, unix: and the API's local socket, which install-server prints (xymonapi(8), XYMONAPI_SOCKET). It runs xymonapi-connect, then registers the server with Claude Code and Codex.
+installed-tools:   server, unix: and the API's local socket, which install --server prints (xymonapi(8), XYMONAPI_SOCKET). It runs xymonapi-connect, then registers the server with Claude Code and Codex.
 uninstalled-tools: Uninstalled xymonapi-mcp. What register did besides, to undo by hand:
 uninstalled-tools:   claude mcp remove --scope user xymon; codex mcp remove xymon
 uninstalled-tools:   revoke this machine's token: curl -X DELETE -u USER https://SERVER/xymon/api/v1/tokens/$(hostname -s)

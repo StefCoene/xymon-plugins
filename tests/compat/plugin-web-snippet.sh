@@ -33,7 +33,9 @@ server_tree "$home"
 snippets=$(sed -n 's/^conf: *//p' "$ROOT/plugins/xymonapi/PLUGIN")
 [ -n "$snippets" ] || fail "plugins/xymonapi/PLUGIN names no snippet"
 
-install() { "$ROOT/install.sh" install-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/$1.log" 2>&1 \
+# install LOG -- install, or update once installed.
+install() { v=install; [ -d "$home/ext/xymonapi" ] && v=update
+	"$ROOT/xymon-plugin" "$v" --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/$1.log" 2>&1 \
 	|| fail "install-server ($1) failed: $(tail -n 5 "$work/$1.log")"; }
 
 # shipped SNIPPET HOME [RUNDIR] -- a snippet as shipped, @XYMONHOME@ filled
@@ -59,7 +61,7 @@ cmp -s "$work/edited" "$home/ext/xymonapi/xymonapi-nginx.conf" || fail "[S16] an
 [ -e "$home/ext/.xymonapi.xymonapi-nginx.conf" ] && fail "[S16] the snippet set aside was left in ext/"
 assert_not_contains "reload the web server" "$(cat "$work/again.log")" "[S16] an install that changes no snippet says nothing of a reload"
 
-"$ROOT/install.sh" uninstall-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/gone.log" 2>&1 || fail "uninstall-server failed"
+"$ROOT/xymon-plugin" remove --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/gone.log" 2>&1 || fail "uninstall-server failed"
 assert_contains "reload the web server" "$(cat "$work/gone.log")" "[S16] an uninstall says to reload the web server"
 for c in $snippets; do
 	[ -e "$home/ext/xymonapi/$c" ] && fail "[S16] uninstall-server left $c"
@@ -72,12 +74,13 @@ done
 # such a line for a made-up older nginx snippet.
 repo=$work/repo
 mkdir -p "$repo"
-cp -R "$ROOT/install.sh" "$ROOT/LICENSE" "$ROOT/plugins" "$repo/"
+cp -R "$ROOT/xymon-plugin" "$ROOT/LICENSE" "$ROOT/plugins" "$repo/"
 printf '# an older version of the nginx snippet\nlocation /xymon/api/ { proxy_pass http://127.0.0.1:1986/xymon/api/; }\n' > "$work/stock-old"
 echo "conf-stock: xymonapi-nginx.conf $(cksum < "$work/stock-old" | cut -d' ' -f1,2)" >> "$repo/plugins/xymonapi/PLUGIN"
 home2=$work/server2
 server_tree "$home2"
-install2() { "$repo/install.sh" install-server xymonapi XYMONHOME="$home2" MANDIR="$work/man2" >"$work/$1.log" 2>&1 \
+install2() { v=install; [ -d "$home2/ext/xymonapi" ] && v=update
+	"$repo/xymon-plugin" "$v" --server xymonapi XYMONHOME="$home2" MANDIR="$work/man2" >"$work/$1.log" 2>&1 \
 	|| fail "install-server ($1) failed: $(tail -n 5 "$work/$1.log")"; }
 install2 fresh
 cp "$work/stock-old" "$home2/ext/xymonapi/xymonapi-nginx.conf"
@@ -101,13 +104,13 @@ assert_not_contains "xymonapi-nginx.conf" "$(cat "$work/same.log")" "[S16] a sni
 # its nginx snippet changed and this one's listed.
 next=$work/next
 mkdir -p "$next"
-cp -R "$ROOT/install.sh" "$ROOT/LICENSE" "$ROOT/plugins" "$next/"
+cp -R "$ROOT/xymon-plugin" "$ROOT/LICENSE" "$ROOT/plugins" "$next/"
 echo "conf-stock: xymonapi-nginx.conf $(cksum < "$ROOT/plugins/xymonapi/xymonapi-nginx.conf" | cut -d' ' -f1,2)" >> "$next/plugins/xymonapi/PLUGIN"
 echo "# the next version's" >> "$next/plugins/xymonapi/xymonapi-nginx.conf"
 for h in "$work/treeA" "$work/tree B"; do
 	server_tree "$h"
-	"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manA" >/dev/null 2>&1 || fail "install-server under $h failed"
-	"$next/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manA" >"$work/next.log" 2>&1 || fail "the next version's install under $h failed"
+	"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$h" MANDIR="$work/manA" >/dev/null 2>&1 || fail "install-server under $h failed"
+	"$next/xymon-plugin" update --server xymonapi XYMONHOME="$h" MANDIR="$work/manA" >"$work/next.log" 2>&1 || fail "the next version's install under $h failed"
 	assert_contains "# the next version's" "$(cat "$h/ext/xymonapi/xymonapi-nginx.conf")" "[S16] this version's snippet under $h is recognised as shipped, and replaced"
 done
 assert_contains "hold characters a web server's configuration may not take" "$(cat "$work/next.log")" \
@@ -116,10 +119,10 @@ assert_contains "hold characters a web server's configuration may not take" "$(c
 # Under a tree whose path is also part of the snippets' text -- /xymon in
 # /xymon/api/ -- an older version's snippet, unedited, is still recognised.
 # DESTDIR stages the tree at /xymon.
-"$repo/install.sh" install-server xymonapi XYMONHOME=/xymon DESTDIR="$work/stage" MANDIR=/usr/share/man >/dev/null 2>&1 \
+"$repo/xymon-plugin" install --server xymonapi XYMONHOME=/xymon DESTDIR="$work/stage" MANDIR=/usr/share/man >/dev/null 2>&1 \
 	|| fail "install-server under DESTDIR at /xymon failed"
 cp "$work/stock-old" "$work/stage/xymon/ext/xymonapi/xymonapi-nginx.conf"
-"$repo/install.sh" install-server xymonapi XYMONHOME=/xymon DESTDIR="$work/stage" MANDIR=/usr/share/man >"$work/xymon.log" 2>&1 \
+"$repo/xymon-plugin" update --server xymonapi XYMONHOME=/xymon DESTDIR="$work/stage" MANDIR=/usr/share/man >"$work/xymon.log" 2>&1 \
 	|| fail "install-server under DESTDIR at /xymon failed"
 assert_not_contains "reload the web server" "$(cat "$work/xymon.log")" "[S16] under DESTDIR there is no web server to reload"
 shipped "$repo/plugins/xymonapi/xymonapi-nginx.conf" /xymon @XYMONRUNDIR@ > "$work/shipped"
@@ -131,7 +134,7 @@ cmp -s "$work/shipped" "$work/stage/xymon/ext/xymonapi/xymonapi-nginx.conf" \
 cfgcase() {
 	h=$work/$1; server_tree "$h"
 	printf '%s\noptional directory %s/etc/xymonserver.d\n' "$2" "$h" > "$h/etc/xymonserver.cfg"
-	"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/man$1" >"$work/$1.log" 2>&1 || fail "install-server ($1) failed"
+	"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$h" MANDIR="$work/man$1" >"$work/$1.log" 2>&1 || fail "install-server ($1) failed"
 	cat "$h/ext/xymonapi/xymonapi-nginx.conf"
 }
 assert_contains "/var/log/xymon/xymonapi/relay.sock" "$(cfgcase logs 'XYMONRUNDIR=""
@@ -147,17 +150,17 @@ h=$work/dropin; server_tree "$h"
 mkdir -p "$h/etc/xymonserver.d"
 echo 'XYMONRUNDIR="/run/xymon"' > "$h/etc/xymonserver.d/local.cfg"
 echo 'XYMONRUNDIR="/backup/run"' > "$h/etc/xymonserver.d/local.cfg~"
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/mandropin" >"$work/dropin.log" 2>&1 || fail "install-server (dropin) failed"
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$h" MANDIR="$work/mandropin" >"$work/dropin.log" 2>&1 || fail "install-server (dropin) failed"
 assert_contains "/run/xymon/xymonapi/relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-nginx.conf")" "[S22] XYMONRUNDIR set in xymonserver.d/ wins over xymonserver.cfg's"
 
 # The runtime directory moved: the snippets the install before wrote,
 # unedited, name the old one, and take this install's; one edited is kept.
 h=$work/moved; server_tree "$h"
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >/dev/null 2>&1 || fail "install-server (moved) failed"
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >/dev/null 2>&1 || fail "install-server (moved) failed"
 echo "# the admin's" >> "$h/ext/xymonapi/xymonapi-apache.conf"
 cp "$h/ext/xymonapi/xymonapi-apache.conf" "$work/edited3"
 mkdir -p "$h/etc/xymonserver.d"; echo 'XYMONRUNDIR="/run/xymon"' > "$h/etc/xymonserver.d/run.cfg"
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >"$work/moved.log" 2>&1 || fail "install-server (moved again) failed"
+"$ROOT/xymon-plugin" update --server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >"$work/moved.log" 2>&1 || fail "install-server (moved again) failed"
 assert_contains "/run/xymon/xymonapi/relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-nginx.conf")" "[S16] a snippet as the install before wrote it, naming a runtime directory moved since, takes this install's"
 assert_not_contains "xymonapi-nginx.conf is kept as edited" "$(cat "$work/moved.log")" "[S16] and is not said to be edited"
 cmp -s "$work/edited3" "$h/ext/xymonapi/xymonapi-apache.conf" || fail "[S16] an edited snippet was replaced when the runtime directory moved"
@@ -165,7 +168,7 @@ assert_contains "xymonapi-apache.conf is kept as edited" "$(cat "$work/moved.log
 assert_contains "xymonapi-apache.conf does not name /run/xymon" "$(cat "$work/moved.log")" "[S16] and to name a runtime directory that is not Xymon's"
 assert_contains "reload the web server" "$(cat "$work/moved.log")" "[S16] and the install says to reload the web server"
 # Edited still at the next install: the record of what was written is kept.
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >"$work/moved2.log" 2>&1 || fail "install-server (moved, third) failed"
+"$ROOT/xymon-plugin" update --server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >"$work/moved2.log" 2>&1 || fail "install-server (moved, third) failed"
 cmp -s "$work/edited3" "$h/ext/xymonapi/xymonapi-apache.conf" || fail "[S16] an edited snippet was replaced at a later install"
 assert_not_contains "reload the web server" "$(cat "$work/moved2.log")" "[S16] nothing changed, no reload said"
 
@@ -175,7 +178,7 @@ assert_not_contains "reload the web server" "$(cat "$work/moved2.log")" "[S16] n
 echo "an outside file" > "$work/victim"
 ln -sf "$work/victim" "$h/ext/xymonapi/xymonapi-nginx.conf"
 cp "$work/victim" "$h/ext/xymonapi/.shipped/xymonapi-nginx.conf"
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >/dev/null 2>&1 || fail "install-server (link) failed"
+"$ROOT/xymon-plugin" update --server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >/dev/null 2>&1 || fail "install-server (link) failed"
 assert_equal "an outside file" "$(cat "$work/victim")" "[S16] an install does not write through a snippet made a link"
 [ -L "$h/ext/xymonapi/xymonapi-nginx.conf" ] && fail "[S16] the snippet made a link was left a link"
 
@@ -185,7 +188,7 @@ echo "another outside file" > "$work/victim2"
 rm -f "$h/ext/xymonapi/xymonapi-lighttpd.conf"
 ln "$work/victim2" "$h/ext/xymonapi/xymonapi-lighttpd.conf"
 cp "$work/victim2" "$h/ext/xymonapi/.shipped/xymonapi-lighttpd.conf"
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >/dev/null 2>&1 || fail "install-server (hard link) failed"
+"$ROOT/xymon-plugin" update --server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >/dev/null 2>&1 || fail "install-server (hard link) failed"
 assert_equal "another outside file" "$(cat "$work/victim2")" "[S16] an install does not write through a snippet hard-linked to another file"
 assert_contains "relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-lighttpd.conf")" "[S16] and the snippet is this version's"
 
@@ -193,10 +196,10 @@ assert_contains "relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-lighttpd.conf")" "
 # the checkout plays it, its PLUGIN naming one snippet fewer.
 drop=$work/drop
 mkdir -p "$drop"
-cp -R "$ROOT/install.sh" "$ROOT/LICENSE" "$ROOT/plugins" "$drop/"
+cp -R "$ROOT/xymon-plugin" "$ROOT/LICENSE" "$ROOT/plugins" "$drop/"
 sed 's/^\(conf: .*\) xymonapi-nginx.conf/\1/; s/^conf: xymonapi-nginx.conf /conf: /' "$drop/plugins/xymonapi/PLUGIN" > "$work/PLUGIN" && mv "$work/PLUGIN" "$drop/plugins/xymonapi/PLUGIN"
 grep -q '^conf: .*xymonapi-nginx.conf' "$drop/plugins/xymonapi/PLUGIN" && fail "the test's copy still names the nginx snippet"
-"$drop/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >"$work/drop.log" 2>&1 || fail "install-server (drop) failed"
+"$drop/xymon-plugin" update --server xymonapi XYMONHOME="$h" MANDIR="$work/manmoved" >"$work/drop.log" 2>&1 || fail "install-server (drop) failed"
 [ -e "$h/ext/xymonapi/xymonapi-nginx.conf" ] && fail "[S16] a snippet this version has no more was left"
 assert_contains "reload the web server" "$(cat "$work/drop.log")" "[S16] an install that drops a snippet says to reload the web server"
 
@@ -208,10 +211,10 @@ if [ -x "${XYMON_SRC:-}/common/xymoncmd" ]; then
 	h=$work/xcmd; server_tree "$h"
 	cp "$XYMON_SRC/common/xymoncmd" "$h/bin/"
 	printf 'XYMONVAR="/var/lib/xymon"\nXYMONRUNDIR="$XYMONVAR/run"\noptional directory %s/etc/xymonserver.d\n' "$h" > "$h/etc/xymonserver.cfg"
-	"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manxcmd" >"$work/xcmd.log" 2>&1 || fail "install-server (xymoncmd) failed"
+	"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$h" MANDIR="$work/manxcmd" >"$work/xcmd.log" 2>&1 || fail "install-server (xymoncmd) failed"
 	assert_contains "/var/lib/xymon/run/xymonapi/relay.sock" "$(cat "$h/ext/xymonapi/xymonapi-nginx.conf")" "[S22] xymoncmd expands a XYMONRUNDIR that names a variable"
 	mkdir -p "$work/xstage/xh"; cp -R "$h/bin" "$h/etc" "$work/xstage/xh/"
-	"$ROOT/install.sh" install-server xymonapi XYMONHOME=/xh DESTDIR="$work/xstage" MANDIR=/usr/share/man >"$work/xstage.log" 2>&1 || fail "install-server (xymoncmd, DESTDIR) failed"
+	"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME=/xh DESTDIR="$work/xstage" MANDIR=/usr/share/man >"$work/xstage.log" 2>&1 || fail "install-server (xymoncmd, DESTDIR) failed"
 	assert_contains "@XYMONRUNDIR@/xymonapi/relay.sock" "$(cat "$work/xstage/xh/ext/xymonapi/xymonapi-nginx.conf")" "[S22] under DESTDIR the stage's xymoncmd is not run"
 else
 	echo "NOTE: the xymoncmd part was not run: no common/xymoncmd in XYMON_SRC"
@@ -220,12 +223,12 @@ fi
 # xymonapi 4.0.0's snippets, with the relay under $XYMONHOME/tmp, are
 # recognised unedited, by this version's conf-stock lines, and replaced.
 h=$work/v4; server_tree "$h"
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manv4" >/dev/null 2>&1 || fail "install-server (v4) failed"
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$h" MANDIR="$work/manv4" >/dev/null 2>&1 || fail "install-server (v4) failed"
 for c in $snippets; do
 	sed -e 's|@XYMONRUNDIR@/xymonapi/relay.sock|@XYMONHOME@/tmp/xymonapi-relay/relay.sock|' -e "s|@XYMONHOME@|$h|g" \
 		"$ROOT/plugins/xymonapi/$c" > "$h/ext/xymonapi/$c"
 done
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$h" MANDIR="$work/manv4" >"$work/v4.log" 2>&1 || fail "install-server (v4 again) failed"
+"$ROOT/xymon-plugin" update --server xymonapi XYMONHOME="$h" MANDIR="$work/manv4" >"$work/v4.log" 2>&1 || fail "install-server (v4 again) failed"
 for c in $snippets; do
 	shipped "$ROOT/plugins/xymonapi/$c" "$h" > "$work/shipped"
 	cmp -s "$work/shipped" "$h/ext/xymonapi/$c" || fail "[S22] xymonapi 4.0.0's $c, unedited, was not replaced by this version's"

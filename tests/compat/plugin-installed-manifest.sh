@@ -27,7 +27,7 @@ work=$(mktempdir)
 v1=$work/v1 v2=$work/v2 v3=$work/v3
 for v in "$v1" "$v2" "$v3"; do
 	mkdir -p "$v"
-	cp -R "$ROOT/install.sh" "$ROOT/LICENSE" "$ROOT/plugins" "$v/"
+	cp -R "$ROOT/xymon-plugin" "$ROOT/LICENSE" "$ROOT/plugins" "$v/"
 done
 mcp=$v2/plugins/xymonapi-mcp
 cp "$mcp/xymonapi-mcp.1" "$mcp/xymon-mcp.1"
@@ -37,9 +37,9 @@ sed -e '/^task: /d' "$v1/plugins/xymonapi-rag/PLUGIN" > "$v2/plugins/xymonapi-ra
 sed -e '/^server-needs: /d' "$v1/plugins/xymonapi-agent/PLUGIN" > "$v2/plugins/xymonapi-agent/PLUGIN"
 rm -rf "$v3/plugins/xymonapi-agent"
 
-# tools VERSION ACTION [PLUGIN...] -- that version's install.sh, your own side.
+# tools VERSION ACTION [PLUGIN...] -- that version's xymon-plugin, your own side.
 prefix=$work/prefix
-tools() { v=$1 a=$2; shift 2; "$v/install.sh" "$a-tools" "$@" PREFIX="$prefix" </dev/null >"$work/tools.log" 2>&1 \
+tools() { v=$1 a=$2; shift 2; [ "$a" = uninstall ] && a=remove; "$v/xymon-plugin" "$a" --tools "$@" PREFIX="$prefix" </dev/null >"$work/tools.log" 2>&1 \
 	|| fail "$a-tools $* from ${v##*/} failed: $(tail -n 5 "$work/tools.log")"; }
 lib=$prefix/libexec/xymon-plugins
 
@@ -57,19 +57,19 @@ tools "$v2" uninstall xymonapi-mcp
 
 # Updated to the other version: the old command and manual page go.
 tools "$v1" install xymonapi-mcp
-tools "$v2" install xymonapi-mcp
+tools "$v2" update xymonapi-mcp
 assert_file_exists "$prefix/bin/xymon-mcp"
 assert_file_exists "$prefix/share/man/man1/xymon-mcp.1"
 [ -e "$prefix/bin/xymonapi-mcp" ] && fail "[S20] an update left the command the old version installed"
 { [ -e "$prefix/share/man/man1/xymonapi-mcp.1" ] || [ -L "$prefix/share/man/man1/xymonapi-mcp.1" ]; } && fail "[S20] an update left the manual page the old version installed"
 
 # A command in its place that the install did not write is not removed.
-tools "$v1" install xymonapi-mcp
+tools "$v1" update xymonapi-mcp
 printf '#!/bin/sh\necho mine\n' > "$prefix/bin/xymon-mcp"
 tools "$v2" uninstall xymonapi-mcp
 tools "$v1" install xymonapi-mcp
 printf '#!/bin/sh\necho mine\n' > "$prefix/bin/xymonapi-mcp"
-tools "$v2" install xymonapi-mcp
+tools "$v2" update xymonapi-mcp
 assert_equal "mine" "$(sh "$prefix/bin/xymonapi-mcp")" "[S20] an update removed a command it did not write"
 tools "$v2" uninstall xymonapi-mcp
 rm -f "$prefix/bin/xymonapi-mcp"
@@ -83,13 +83,13 @@ tools "$v1" uninstall xymonapi-mcp
 # The server side.
 home=$work/server
 server_tree "$home"
-server() { v=$1 a=$2; shift 2; "$v/install.sh" "$a-server" "$@" XYMONHOME="$home" MANDIR="$work/man" </dev/null >"$work/server.log" 2>&1; }
+server() { v=$1 a=$2; shift 2; [ "$a" = uninstall ] && a=remove; "$v/xymon-plugin" "$a" --server "$@" XYMONHOME="$home" MANDIR="$work/man" </dev/null >"$work/server.log" 2>&1; }
 
 server "$v1" install xymonapi-rag || fail "install-server xymonapi-rag failed: $(tail -n 5 "$work/server.log")"
 assert_file_exists "$home/ext/xymonapi-rag/PLUGIN"
 server "$v1" enable xymonapi-rag || fail "enable-server xymonapi-rag failed: $(tail -n 5 "$work/server.log")"
 [ -L "$home/etc/tasks.d/xymonapi-rag" ] || fail "enable-server made no link"
-server "$v2" install xymonapi-rag || fail "install-server xymonapi-rag from v2 failed: $(tail -n 5 "$work/server.log")"
+server "$v2" update xymonapi-rag || fail "install-server xymonapi-rag from v2 failed: $(tail -n 5 "$work/server.log")"
 [ -e "$home/etc/tasks.d/xymonapi-rag" ] || [ -L "$home/etc/tasks.d/xymonapi-rag" ] \
 	&& fail "[S20] an update to a version with no task left the task link"
 [ -e "$home/ext/.xymonapi-rag.tasks.cfg" ] && fail "[S20] an update to a version with no task left its task file aside"
@@ -135,7 +135,7 @@ rm -f "$prefix/bin/xymonapi-mcp"
 
 # A task file in the link's place -- an older install's copy, or the one an
 # editor left -- goes with the plugin.
-server "$v1" install xymonapi-rag || fail "install-server xymonapi-rag failed: $(tail -n 5 "$work/server.log")"
+server "$v1" update xymonapi-rag || fail "install-server xymonapi-rag failed: $(tail -n 5 "$work/server.log")"
 rm -f "$home/etc/tasks.d/xymonapi-rag"
 mkdir -p "$home/etc/tasks.d"
 cp "$home/ext/xymonapi-rag/tasks.cfg" "$home/etc/tasks.d/xymonapi-rag"
@@ -151,18 +151,18 @@ server "$v2" uninstall xymonapi-mcp xymonapi-agent \
 # A plugin gone from the checkout is told of by status, and goes with an
 # uninstall given no names.
 server "$v1" install xymonapi-agent || fail "install-server xymonapi-agent failed: $(tail -n 5 "$work/server.log")"
-out=$("$v3/install.sh" status-server XYMONHOME="$home" 2>&1)
+out=$("$v3/xymon-plugin" status --server XYMONHOME="$home" 2>&1)
 assert_contains "xymonapi-agent: " "$out" "[S20] status tells of a plugin gone from the checkout"
 assert_contains "not in this checkout" "$out" "[S20] and says it is gone from it"
-server "$v3" uninstall || fail "[S20] uninstall with no names, a plugin gone from the checkout installed, failed: $(tail -n 5 "$work/server.log")"
+server "$v3" uninstall --all || fail "[S20] uninstall with no names, a plugin gone from the checkout installed, failed: $(tail -n 5 "$work/server.log")"
 [ -e "$home/ext/xymonapi-agent" ] && fail "[S20] uninstall with no names left a plugin gone from the checkout"
 
 # status reads the installed copy: v1's xymonapi-rag, on, told of as on by
 # v2, whose xymonapi-rag has no task.
 server "$v1" install xymonapi-rag || fail "install-server xymonapi-rag failed: $(tail -n 5 "$work/server.log")"
 server "$v1" enable xymonapi-rag || fail "enable-server xymonapi-rag failed: $(tail -n 5 "$work/server.log")"
-assert_contains "xymonapi-rag: " "$("$v2/install.sh" status-server xymonapi-rag XYMONHOME="$home" 2>&1)" "status from another version tells of the plugin"
-assert_contains ", on;" "$("$v2/install.sh" status-server xymonapi-rag XYMONHOME="$home" 2>&1)" "[S20] status reads the task from the installed copy"
+assert_contains "xymonapi-rag: " "$("$v2/xymon-plugin" status --server xymonapi-rag XYMONHOME="$home" 2>&1)" "status from another version tells of the plugin"
+assert_contains ", on;" "$("$v2/xymon-plugin" status --server xymonapi-rag XYMONHOME="$home" 2>&1)" "[S20] status reads the task from the installed copy"
 server "$v1" uninstall xymonapi-rag || fail "uninstall-server xymonapi-rag failed: $(tail -n 5 "$work/server.log")"
 
 # The command is compared byte for byte: one differing by its last
@@ -183,14 +183,14 @@ tools "$v1" uninstall xymonapi-mcp
 	&& fail "[S20] an install from before the copy kept its copied manual page"
 
 # Under DESTDIR, the manual page links to the directory as installed.
-"$v1/install.sh" install-server xymonapi-mcp XYMONHOME=/usr/lib/xymon/server DESTDIR="$work/stage" MANDIR=/usr/share/man \
+"$v1/xymon-plugin" install --server xymonapi-mcp XYMONHOME=/usr/lib/xymon/server DESTDIR="$work/stage" MANDIR=/usr/share/man \
 	</dev/null >"$work/stage.log" 2>&1 || fail "install-server under DESTDIR failed: $(tail -n 5 "$work/stage.log")"
 assert_equal "/usr/lib/xymon/server/ext/xymonapi-mcp/xymonapi-mcp.1" "$(readlink "$work/stage/usr/share/man/man1/xymonapi-mcp.1")" \
 	"[S20] under DESTDIR the manual page links to the directory as installed"
 
 # A name a shell would expand is no plugin name, on the command line or
 # in a record's needs:.
-rc=0; "$v1/install.sh" uninstall-server 'xymonapi*' XYMONHOME="$home" </dev/null >"$work/glob.log" 2>&1 || rc=$?
+rc=0; "$v1/xymon-plugin" remove --server 'xymonapi*' XYMONHOME="$home" </dev/null >"$work/glob.log" 2>&1 || rc=$?
 [ "$rc" -ne 0 ] || fail "[S20] a plugin name with a * was taken"
 assert_contains "not a plugin name" "$(cat "$work/glob.log")" "[S20] and refused as one"
 

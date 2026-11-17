@@ -1,5 +1,5 @@
 # The Xymon API, xymonapi(8): a read-only HTTP and JSON view of this server.
-# Off once installed, since it needs Python 3.9: ./install.sh enable-server xymonapi.
+# Off once installed, since it needs Python 3.9: ./xymon-plugin enable --server xymonapi.
 # Its own settings, listed in xymonapi(8) under ENVIRONMENT, go in a file
 # under xymonserver.d/.
 [xymonapi]
