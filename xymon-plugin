@@ -56,9 +56,14 @@ usage() {
 	exit 2
 }
 
-[ $# -ge 1 ] || usage
+# No verb: on a terminal, the dialogue; off one, the usage (S17).
+if [ $# -eq 0 ]; then
+	[ -t 0 ] && [ -t 1 ] || usage
+	set -- dialogue
+fi
 VERB=$1; shift
 case $VERB in
+	dialogue) ;;
 	install|update|enable|disable|remove|status) ;;
 	venv) die "venv is now part of install and update: ./xymon-plugin update --server --venv, or --tools --venv" ;;
 	install-server|install-tools|uninstall-server|uninstall-tools|enable-server|disable-server|status-server|status-tools|venv-server|venv-tools)
@@ -1292,6 +1297,112 @@ uninstall_tools() {
 	if [ -f "$ROOT/plugins/$1/PLUGIN" ]; then say "$1" uninstalled-tools; else echo "Uninstalled $1."; fi
 }
 
+# installed ROOT PLUGIN -- its VERSION there, read as X.Y.Z, or nothing.
+installed() { [ -f "$1/$2/VERSION" ] && sed -e 's|^.*/v||' "$1/$2/VERSION"; }
+
+# dialogue -- with no verb, on a terminal: where things stand, then what
+# applies, nothing by default; the command those answers spell printed,
+# confirmed and run, and nothing else; after an install, enabling offered
+# as a second command, [y/N]; then it stops.
+dialogue() {
+	me=$0
+	if [ -n "$XYMONHOME" ] || [ -n "$(xymon_trees | sed -n 's/^server //p')" ]; then
+		[ -n "$XYMONHOME" ] || choose_tree
+		server_paths
+	fi
+	echo
+	if [ -n "$XYMONHOME" ]; then
+		echo "Xymon server: $XYMONHOME"
+		for n in $(all_plugins); do
+			v=$(installed "$EXTROOT" "$n") || continue
+			st=
+			if [ -n "$(held "$EXTROOT" "$n" task)" ]; then
+				if [ -L "$TASKDIR/$n" ]; then st=", on"; else st=", off"; fi
+			fi
+			echo "  $n $v$st"
+		done
+	else
+		echo "No Xymon server here."
+	fi
+	echo "Your tools, $PREFIX:"
+	for n in $(all_plugins); do
+		v=$(installed "$TOOLSROOT" "$n") || continue
+		echo "  $n $v"
+	done
+	# What applies, one line each, its command after a tab.
+	opts=
+	add() { opts="$opts$1	$2
+"; }
+	hx=
+	[ -z "$XYMONHOME" ] || hx="XYMONHOME=$XYMONHOME "
+	if [ -n "$XYMONHOME" ]; then
+		for n in $(all_plugins); do
+			[ -n "$(field "$n" server-files)" ] || continue
+			installed "$EXTROOT" "$n" >/dev/null && continue
+			w=; for d in $(needs "$n" server 2>/dev/null); do installed "$EXTROOT" "$d" >/dev/null || w="$w $d"; done
+			add "install $n on the server${w:+, with$w}: $(field "$n" summary)" "${hx}$me install --server $n"
+		done
+		any=
+		for n in $(all_plugins); do
+			installed "$EXTROOT" "$n" >/dev/null || continue
+			any=1
+			[ -n "$(held "$EXTROOT" "$n" task)" ] || continue
+			if [ -L "$TASKDIR/$n" ]; then add "turn $n off" "${hx}$me disable --server $n"
+			else add "turn $n on" "${hx}$me enable --server $n"; fi
+		done
+		[ -z "$any" ] || add "update the server's plugins" "${hx}$me update --server"
+		for n in $(all_plugins); do
+			installed "$EXTROOT" "$n" >/dev/null || continue
+			by=
+			for p in $(all_plugins); do
+				installed "$EXTROOT" "$p" >/dev/null || continue
+				case " $(needs "$p" server "$EXTROOT" 2>/dev/null) " in *" $n "*) by="$by $p" ;; esac
+			done
+			[ -z "$by" ] || continue
+			add "remove $n from the server" "${hx}$me remove --server $n"
+		done
+	fi
+	tany=
+	for n in $(all_plugins); do
+		[ -n "$(field "$n" tools-files)" ] || continue
+		if installed "$TOOLSROOT" "$n" >/dev/null; then tany=1; continue; fi
+		add "install $n for you: $(field "$n" summary)" "$me install --tools $n"
+	done
+	[ -z "$tany" ] || add "update your tools" "$me update --tools"
+	echo
+	echo "What do you want to do?"
+	echo "  0) nothing"
+	i=0
+	printf '%s' "$opts" | while IFS='	' read -r label cmd; do
+		i=$((i + 1)); echo "  $i) $label"
+	done
+	n=$(printf '%s' "$opts" | grep -c .)
+	printf 'What do you want to do? [0] '
+	read -r ans || ans=
+	case $ans in ''|0) echo "Nothing done."; return 0 ;; *[!0-9]*) die "no such choice: $ans" ;; esac
+	[ "$ans" -le "$n" ] || die "no such choice: $ans"
+	cmd=$(printf '%s' "$opts" | sed -n "${ans}p" | cut -f2)
+	echo "I will run:  $cmd"
+	printf 'Proceed? [Y/n] '
+	read -r yn || yn=n
+	case $yn in [Nn]*) echo "Nothing done."; return 0 ;; esac
+	eval "$cmd" || exit $?
+	# After an install of a part with a task: enabling, a second command,
+	# Enter declining it.
+	case $cmd in
+		*" install --server "*)
+			n=${cmd##* }
+			if [ -n "$(field "$n" task)" ]; then
+				ecmd="${hx}$me enable --server $n"
+				echo "Turn it on now?"
+				echo "I will run:  $ecmd"
+				if offer "Proceed?"; then eval "$ecmd" || exit $?; else echo "$n stays off: $ecmd turns it on."; fi
+			fi ;;
+	esac
+}
+
+if [ "$VERB" = dialogue ]; then dialogue; exit 0; fi
+
 # The part acted on: named, or, on a terminal, the server part, said; off a
 # terminal a verb that changes something needs it named; status covers both.
 [ -z "$SEL_TOOLS" ] || [ -z "$SEL_SERVER" ] \
@@ -1325,8 +1436,6 @@ if [ -n "$NAMES" ]; then LIST=$NAMES; else LIST=$(all_plugins); fi
 deepest_first() {
 	for n in $LIST; do echo "$(depth "$n" "$2" "$1") $n"; done | sort -rn | cut -d' ' -f2
 }
-# installed ROOT PLUGIN -- its VERSION there, read as X.Y.Z, or nothing.
-installed() { [ -f "$1/$2/VERSION" ] && sed -e 's|^.*/v||' "$1/$2/VERSION"; }
 
 case $VERB in
 	install)

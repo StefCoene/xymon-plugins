@@ -48,7 +48,9 @@ and you install the one the machine plays: a verb, then `--server` or
 meant, and said; in a script, name it. The Xymon installation is
 `XYMONHOME`, or `--xymon-home PATH`, which wins; on a terminal it may be
 left out: the server found is proposed, or, with several, the one used
-last, and the command says which it acts on before it changes anything.
+last, and the command says which it acts on before it changes anything. Run with no verb on a
+terminal, `./xymon-plugin` says where things stand and offers what applies,
+printing and running the command chosen.
 `--client` is refused: a client here
 is Xymon's, on a monitored host, and no plugin has a part there yet.
 
