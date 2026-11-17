@@ -29,11 +29,13 @@ tree() {
 	mkdir -p "$d"
 	for m in "$@"; do mkdir -p "$d/$(dirname "$m")"; : > "$d/$m"; done
 }
-# run ACTION HOME [NAME=value...] -- install.sh ACTION xymonapi on HOME,
+# verb ACTION -- the xymon-plugin verb and part for ACTION-SIDE.
+verb() { v=${1%-*}; [ "$v" = uninstall ] && v=remove; echo "$v --${1##*-}"; }
+# run ACTION HOME [NAME=value...] -- xymon-plugin ACTION xymonapi on HOME,
 # its output in out, its exit code in rc.
 run() {
 	a=$1; h=$2; shift 2
-	rc=0; out=$("$ROOT/install.sh" "$a" xymonapi XYMONHOME="$h" MANDIR="$man" "$@" </dev/null 2>&1) || rc=$?
+	rc=0; out=$("$ROOT/xymon-plugin" $(verb "$a") xymonapi XYMONHOME="$h" MANDIR="$man" "$@" </dev/null 2>&1) || rc=$?
 }
 # refused LABEL HOME TEXT -- install-server on HOME fails, says TEXT and
 # leaves HOME as it was.
@@ -63,7 +65,8 @@ find "$work/bare" | sort > "$work/before"
 for a in install-server enable-server disable-server status-server uninstall-server venv-server; do
 	for p in xymonapi ""; do
 		rc=0
-		"$ROOT/install.sh" "$a" $p XYMONHOME="$work/bare" MANDIR="$man" </dev/null >"$work/a.log" 2>&1 || rc=$?
+		all=; [ -n "$p" ] || case $a in install-*|uninstall-*) all=--all ;; esac
+		"$ROOT/xymon-plugin" $(verb "$a") $all $p XYMONHOME="$work/bare" MANDIR="$man" </dev/null >"$work/a.log" 2>&1 || rc=$?
 		[ "$rc" -ne 0 ] || fail "[S18] $a ${p:-(every plugin)} on a tree with no marks succeeded"
 		assert_contains "none of etc/xymonserver.cfg bin/xymond is there" "$(cat "$work/a.log")" "[S18] $a ${p:-(every plugin)}: refused for the marks"
 	done
@@ -93,7 +96,7 @@ assert_file_exists "$work/stage/usr/lib/xymon/server/ext/xymonapi/VERSION"
 
 rc=0
 out=$(XYMON_PLUGINS_TREES="$work/server:$work/client:$work/half:$work/debian-client" \
-	"$ROOT/install.sh" install-server xymonapi MANDIR="$man" </dev/null 2>&1) || rc=$?
+	"$ROOT/xymon-plugin" install --server xymonapi MANDIR="$man" </dev/null 2>&1) || rc=$?
 [ "$rc" -ne 0 ] || fail "[S18] install-server without XYMONHOME succeeded"
 assert_contains "$work/server, a Xymon server" "$out" "[S18] without XYMONHOME, the server's tree found is named"
 assert_contains "$work/client, a Xymon client" "$out" "[S18] and the client's"
@@ -107,12 +110,12 @@ printf '#!/bin/sh\n[ "$1" = --prefix ] && echo "%s/brew"\n' "$work" > "$work/bin
 chmod 755 "$work/bin/brew"
 server_tree "$work/brew/opt/xymon-server/server"
 rc=0
-out=$(PATH="$work/bin:$PATH" XYMON_PLUGINS_TREES="" "$ROOT/install.sh" install-server xymonapi MANDIR="$man" </dev/null 2>&1) || rc=$?
+out=$(PATH="$work/bin:$PATH" XYMON_PLUGINS_TREES="" "$ROOT/xymon-plugin" install --server xymonapi MANDIR="$man" </dev/null 2>&1) || rc=$?
 assert_contains "$work/brew/opt/xymon-server/server, a Xymon server" "$out" "[S18] Homebrew's server tree is found"
 
 # Under DESTDIR without XYMONHOME, the host's trees are not read.
 rc=0
-out=$(XYMON_PLUGINS_TREES="$work/server" "$ROOT/install.sh" status-server DESTDIR="$work/stage" </dev/null 2>&1) || rc=$?
+out=$(XYMON_PLUGINS_TREES="$work/server" "$ROOT/xymon-plugin" status --server DESTDIR="$work/stage" </dev/null 2>&1) || rc=$?
 [ "$rc" -ne 0 ] || fail "[S18] status-server under DESTDIR without XYMONHOME succeeded"
 assert_not_contains "$work/server" "$out" "[S18] under DESTDIR, no tree of the host is read"
 

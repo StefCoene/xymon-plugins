@@ -36,7 +36,7 @@ and which you inferred.
 - `plugins/xymonapi/openapi.yaml` the contract, with its numbered rules.
 - `plugins/<name>/tests/` each plugin's tests, `tests/compat/` those of how
   the plugins fit together, `tests/lib/` their helpers, `tests/eval/` the
-  search's questions; `install.sh` the installer, which reads each
+  search's questions; `xymon-plugin` the installer, which reads each
   plugin's `PLUGIN` file.
 
 ## Do not

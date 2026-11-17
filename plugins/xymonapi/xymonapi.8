@@ -14,7 +14,7 @@ It changes nothing in Xymon: it only reads.
 It is optional, and shipped disabled. It is started by
 .I xymonlaunch(8)
 from the task file \fBext/xymonapi/tasks.cfg\fR, once
-\fB./install.sh enable-server xymonapi\fR has linked it from
+\fB./xymon-plugin enable --server xymonapi\fR has linked it from
 \fBtasks.d/xymonapi\fR beside tasks.cfg; its installation makes no link.
 xymonlaunch starts it once xymond is running, and restarts it if it stops.
 
@@ -99,11 +99,11 @@ install from at this server's versions: a gzipped tar rooted at
 xymon-plugins/, laid out as the repository is -- plugins/NAME for each
 plugin installed here, holding only what its PLUGIN file names: itself,
 README.md, its files, manual pages, task and snippets; no test, and no
-other file left beside them -- with install.sh and LICENSE.
-\fB./install.sh install-tools NAME\fR there installs that plugin.
-Each plugin's \fB./install.sh install-server\fR stages its directory in
+other file left beside them -- with xymon-plugin and LICENSE.
+\fB./xymon-plugin install --tools NAME\fR there installs that plugin.
+Each plugin's \fB./xymon-plugin install --server\fR stages its directory in
 $XYMONHOME/ext/xymon-plugins-dist/, which is what /plugins packs, and its
-\fB./install.sh uninstall-server\fR takes it out; this API names no plugin. It is the one
+\fB./xymon-plugin remove --server\fR takes it out; this API names no plugin. It is the one
 path open without a user when XYMONAPI_PASSWD is set: it holds the
 plugins' code and nothing else -- no user, password, token or setting --
 though a stranger learns from it which plugins, at which versions, run
@@ -333,7 +333,7 @@ or a file that cannot be read, stops the API from starting, since running
 without the hiding asked for would be worse than not running.
 .IP "\fBXYMONAPI_ASK\fR"
 Set to 1, /ask is there; unset, empty, 0, no, off or false, it is not.
-It needs xymonapi-agent installed beside the API (\fB./install.sh install-server xymonapi-agent\fR),
+It needs xymonapi-agent installed beside the API (\fB./xymon-plugin install --server xymonapi-agent\fR),
 an agent CLI installed and logged in as the Xymon user, and the socket
 (XYMONAPI_SOCKET), through which the agent reads this API. Which CLI,
 model and agent answer are xymonapi-agent(1)'s own settings,
@@ -345,11 +345,11 @@ For /ask: questions a caller may ask in an hour, 60, 0 for no limit; seconds
 to wait for the agent, 300; the longest question, 2000 characters.
 .IP "\fBXYMONAPI_PYTHON\fR"
 The Python to run the API with. Unset, the launcher takes the python3 of
-the virtualenv beside the plugins, $XYMONHOME/ext/venv, which \fB./install.sh
-venv\fR makes with the modules the installed plugins need; without one, the
+the virtualenv beside the plugins, $XYMONHOME/ext/venv, which \fB./xymon-plugin
+venv --server\fR makes with the modules the installed plugins need; without one, the
 first of python3, python3.14 down to python3.9, found on PATH. When that
 one lacks a module, the API says which on
-stderr, the task's log, names \fB./install.sh venv-server\fR, and exits with 77.
+stderr, the task's log, names \fB./xymon-plugin venv --server\fR, and exits with 77.
 
 .SH FILES
 .IP "\fB$XYMONHOME/ext/xymonapi/\fR"
@@ -410,7 +410,7 @@ itself (XYMONAPI_TLS_CERT), and where the web server has a certificate the
 snippets under FILES pass /xymon/api/ to the API's relay socket over it.
 An SSH tunnel to the relay socket is encrypted too, with nothing to set up:
 ssh -L 1986:/run/xymon/xymonapi/relay.sock HOST, where Xymon's runtime
-directory (XYMONRUNDIR) is /run/xymon: install-server prints the path. A client is given
+directory (XYMONRUNDIR) is /run/xymon: install --server prints the path. A client is given
 the URL that reaches the API, scheme, host and port, without /xymon/api/v1,
 which it adds: https://HOST:1986 for the API's own HTTPS; the web server's,
 https://HOST, or https://HOST:PORT when its HTTPS port is not 443, for the

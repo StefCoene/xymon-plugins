@@ -23,7 +23,7 @@ mkdir -p "$work/bad"
 chmod 755 "$work/bad/python3.12"
 
 rc=0
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$work/server" MANDIR="$work/man" PYTHON="$work/bad/python3.12" \
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$work/server" MANDIR="$work/man" PYTHON="$work/bad/python3.12" \
 	</dev/null > "$work/install.log" 2>&1 || rc=$?
 [ "$rc" -eq 0 ] || fail "install-server failed: $(tail -n 5 "$work/install.log")"
 assert_not_contains "Made $work/server/ext/venv" "$(cat "$work/install.log")" "an empty file is not taken for a Python"
@@ -31,7 +31,7 @@ assert_contains "No virtualenv at $work/server/ext/venv" "$(cat "$work/install.l
 [ -e "$work/server/ext/venv" ] && fail "a virtualenv directory was left from the empty file"
 
 rc=0
-"$ROOT/install.sh" venv-server XYMONHOME="$work/server" PYTHON="$work/bad/python3.12" </dev/null > "$work/venv.log" 2>&1 || rc=$?
+"$ROOT/xymon-plugin" venv --server XYMONHOME="$work/server" PYTHON="$work/bad/python3.12" </dev/null > "$work/venv.log" 2>&1 || rc=$?
 [ "$rc" -ne 0 ] || fail "venv-server with an empty file for a Python succeeded: $(cat "$work/venv.log")"
 assert_contains "made no virtualenv at $work/server/ext/venv" "$(cat "$work/venv.log")" "venv-server says the Python made none"
 
@@ -39,7 +39,7 @@ assert_contains "made no virtualenv at $work/server/ext/venv" "$(cat "$work/venv
 printf '#!/bin/sh\ncase "$*" in *"-m venv"*) echo "ensurepip is not available" >&2; exit 1 ;; *executable*) echo "$0" ;; esac\nexit 0\n' > "$work/bad/python3"
 chmod 755 "$work/bad/python3"
 rc=0
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$work/server" MANDIR="$work/man" PYTHON="$work/bad/python3" \
+"$ROOT/xymon-plugin" update --server xymonapi XYMONHOME="$work/server" MANDIR="$work/man" PYTHON="$work/bad/python3" \
 	</dev/null > "$work/install2.log" 2>&1 || rc=$?
 [ "$rc" -eq 0 ] || fail "install-server stopped where a virtualenv could not be made: $(tail -n 3 "$work/install2.log")"
 assert_contains "Could not make a virtualenv at $work/server/ext/venv with $work/bad/python3" "$(cat "$work/install2.log")" "a venv that cannot be made is said, and the install goes on"

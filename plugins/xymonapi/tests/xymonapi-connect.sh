@@ -3,7 +3,7 @@
 #
 # plugins/xymonapi/tests/xymonapi-connect.sh
 #
-# xymonapi-connect, as ./install.sh install-tools lays it out, connects a machine to
+# xymonapi-connect, as ./xymon-plugin install --tools lays it out, connects a machine to
 # the API: it reads a user and a password holding a space, a quote, a
 # backslash and a glob character, gets the API to take them as they are, and
 # keeps the token it gets for this machine's short hostname -- mode 600, not
@@ -32,12 +32,12 @@ work=$(mktempdir)
 server_tree "$work/inst"
 register_cleanup 'stop_process "$API_PID"'
 
-# The API as ./install.sh install-server lays it out, its VERSION the client's, and the
-# client as ./install.sh install-tools does.
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$work/inst" MANDIR="$work/man" >"$work/install.log" 2>&1 \
-	|| fail "install.sh install-server failed: $(tail -n 5 "$work/install.log")"
-"$ROOT/install.sh" install-tools xymonapi PREFIX="$work/client" >"$work/client.log" 2>&1 \
-	|| fail "install.sh install-tools failed: $(tail -n 5 "$work/client.log")"
+# The API as ./xymon-plugin install --server lays it out, its VERSION the client's, and the
+# client as ./xymon-plugin install --tools does.
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$work/inst" MANDIR="$work/man" >"$work/install.log" 2>&1 \
+	|| fail "xymon-plugin install --server failed: $(tail -n 5 "$work/install.log")"
+"$ROOT/xymon-plugin" install --tools xymonapi PREFIX="$work/client" >"$work/client.log" 2>&1 \
+	|| fail "xymon-plugin install --tools failed: $(tail -n 5 "$work/client.log")"
 connect=$work/client/bin/xymonapi-connect
 assert_file_exists "$connect"
 mine=$(cat "$work/client/libexec/xymon-plugins/xymonapi/VERSION")

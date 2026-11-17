@@ -41,11 +41,17 @@ check() {
 }
 # fresh -- an empty stage with Xymon's server tree in it.
 fresh() { rm -rf "$stage"; mkdir -p "$stage$home"; }
-# run ACTION SIDE [NAME=value...] -- install.sh ACTION-SIDE xymonapi under DESTDIR.
+# run ACTION SIDE [NAME=value...] -- xymon-plugin ACTION-SIDE xymonapi under DESTDIR.
 run() {
 	a=$1 s=$2; shift 2
-	"$ROOT/install.sh" "$a-$s" xymonapi XYMONHOME="$home" PREFIX=/opt/x MANDIR=/usr/share/man DESTDIR="$stage" "$@" \
-		</dev/null >"$work/run.log" 2>&1 || fail "$a-$s under DESTDIR failed: $(tail -n 5 "$work/run.log")"
+	# install where installed already is an update.
+	v=$a; [ "$v" = uninstall ] && v=remove
+	go() { g=$1; shift; "$ROOT/xymon-plugin" "$g" "--$s" xymonapi XYMONHOME="$home" PREFIX=/opt/x MANDIR=/usr/share/man DESTDIR="$stage" "$@" \
+		</dev/null >"$work/run.log" 2>&1; }
+	if ! go "$v" "$@"; then
+		{ [ "$v" = install ] && grep -q 'is installed already' "$work/run.log" && go update "$@"; } \
+			|| fail "$a-$s under DESTDIR failed: $(tail -n 5 "$work/run.log")"
+	fi
 }
 cycle() {   # cycle LABEL -- install, enable, disable, uninstall on the server
 	for a in install enable disable uninstall; do run "$a" server; check "$a-server, $1"; done
@@ -125,7 +131,7 @@ run install tools; check "install-tools, bin an absolute link"
 # No virtualenv is made or used under DESTDIR, a link there or not.
 fresh; run install server
 ln -s "$host" "$stage$home/ext/venv"
-rc=0; "$ROOT/install.sh" venv-server XYMONHOME="$home" DESTDIR="$stage" </dev/null >"$work/venv.log" 2>&1 || rc=$?
+rc=0; "$ROOT/xymon-plugin" venv --server XYMONHOME="$home" DESTDIR="$stage" </dev/null >"$work/venv.log" 2>&1 || rc=$?
 [ "$rc" -ne 0 ] || fail "[S21] venv-server under DESTDIR succeeded"
 assert_contains "not under DESTDIR" "$(cat "$work/venv.log")" "[S21] and says why"
 check "venv-server under DESTDIR"
@@ -133,7 +139,7 @@ check "venv-server under DESTDIR"
 # A directory at tasks.d/NAME is no task link: enable refuses it.
 fresh; run install server
 mkdir -p "$stage$home/etc/tasks.d/xymonapi"
-rc=0; "$ROOT/install.sh" enable-server xymonapi XYMONHOME="$home" DESTDIR="$stage" </dev/null >"$work/en.log" 2>&1 || rc=$?
+rc=0; "$ROOT/xymon-plugin" enable --server xymonapi XYMONHOME="$home" DESTDIR="$stage" </dev/null >"$work/en.log" 2>&1 || rc=$?
 [ "$rc" -ne 0 ] || fail "enable-server over a directory at tasks.d/xymonapi succeeded"
 assert_contains "is a directory" "$(cat "$work/en.log")" "and says why"
 

@@ -63,7 +63,7 @@ to come.
 
 **S1. A plugin is a directory with a `PLUGIN` file.**
 `plugins/NAME/` holds the `PLUGIN` file, a README, a manual page per side,
-tests and the code. `install.sh` installs every plugin from its `PLUGIN`
+tests and the code. `xymon-plugin` installs every plugin from its `PLUGIN`
 file, and names none.
 
 **S2. A plugin carries its version.**
@@ -82,7 +82,7 @@ that plugin.
 
 **S14. A plugin names the Xymon it needs.**
 A `xymon:` line in `PLUGIN`, `X.Y.Z`, gives the lowest Xymon version the
-plugin's server side works with. `install-server` compares it with what
+plugin's server side works with. `install --server` compares it with what
 `$XYMONHOME/bin/xymon --version` gives, for the plugin and each it needs,
 before it installs any:
 
@@ -96,7 +96,7 @@ before it installs any:
   it may lack what came before that release.
 
 A plugin that needs a newer Xymon for one feature alone says so in its README
-instead. Whatever the version, `install-server` says so when the server's
+instead. Whatever the version, `install --server` says so when the server's
 `xymonserver.cfg` does not read `xymonserver.d/`, where the plugins'
 settings go: a configuration kept from before 4.3.31 ignores them.
 
@@ -130,10 +130,10 @@ it; under `DESTDIR` the link names the installed file. A regular file at
 in place of the link -- is the one xymonlaunch reads: it is moved into the
 plugin's directory as it was, and linked unless it was `DISABLED`. A link
 at `tasks.d/NAME` to something else is left as it is, and the install,
-before it installs anything, `enable-server` and `disable-server` refused.
+before it installs anything, `enable` and `disable` refused.
 
 **S7. An update replaces the code and keeps the choices.**
-Installing again replaces the plugin's directory as a whole, so a file a
+`update` replaces the plugin's directory as a whole, so a file a
 newer version no longer ships is gone; it keeps the task file as the
 administrator left it, whether it is on, and the web server snippets as the
 administrator edited them.
@@ -174,7 +174,7 @@ name Xymon's runtime directory is said to.
 **S13. A plugin is on when its link is there.**
 A plugin's task is on when `etc/tasks.d/NAME` links to its task file, and
 off when the link is absent: xymonlaunch has the task exactly then.
-`enable-server` makes the link, `disable-server` removes it, and each says
+`enable` makes the link, `disable` removes it, and each says
 so when there is nothing to do. The task file carries no `DISABLED`: one an
 older install wrote with that line is off, and the line is taken out, and
 the install says how to turn it on.
@@ -183,7 +183,7 @@ the install says how to turn it on.
 What a server stages for `/plugins`, in `ext/xymon-plugins-dist`, is for
 each plugin its `PLUGIN` file, its `README.md`, and the files, manual
 pages, task and web server snippets its `PLUGIN` file names, with
-`install.sh` and `LICENSE`: a file left beside them in the checkout is not
+`xymon-plugin` and `LICENSE`: a file left beside them in the checkout is not
 served. Each install prunes what is staged to the same, and to the
 plugins installed on the server, before staging, so that what an older
 install staged, or a plugin since renamed or removed left, is not served
@@ -246,8 +246,8 @@ takes them away when it stops.
 **S23. A plugin's SELinux module grants nothing until the admin says so.**
 A plugin that needs a SELinux rule ships it as a module, `NAME.cil` among
 its server files, named in its `PLUGIN` file's `selinux:` line. Where
-SELinux is active, `install-server` loads it with `semodule` and says how
-to switch it on: what it grants lies behind booleans, off. `uninstall-server`
+SELinux is active, `install --server` loads it with `semodule` and says how
+to switch it on: what it grants lies behind booleans, off. `remove --server`
 removes it, and an update to a version without one: the module named after
 the plugin, never one the installed `PLUGIN` copy names otherwise. Under
 `DESTDIR`, or where SELinux is not active, nothing is loaded. The module
@@ -258,7 +258,7 @@ the command.
 ### Knowing what is installed
 
 **S15. `status` says what is installed.**
-`status-server` and `status-tools` say, for each plugin of the side, or
+`status --server` and `status --tools` say, for each plugin of the part, or
 those named: whether it is installed, the version installed, from its
 `VERSION`, a release tag read as its `X.Y.Z`; on the server, whether its
 task is on; and the version of the checkout run from, marked newer when it
@@ -271,6 +271,20 @@ Run with no verb, its input or its output not on a terminal, the command
 prints its usage, exits 2 and changes nothing, settings given or not: a
 script that forgot its verb installs, enables and removes nothing.
 
+**S24. One command: a verb, and the part it acts on.**
+`xymon-plugin` takes a verb -- `install`, `update`, `enable`, `disable`,
+`remove`, `status`, `venv` -- and the part it acts on, `--server` or
+`--tools`, the latter alone. An action of the `install.sh` it replaces, as
+`install-server`, is refused, naming the new form; so is `--client`, until
+a plugin has a client part. Without a part named, on a terminal, the
+server part is said and acted on; off one, a verb that changes something
+is refused; `status` covers both. `install` and `remove` need a plugin
+named, or `--all`. `install` refuses a plugin installed already, and
+`update` one that is not; `--all`, and a plugin one needs, pass over those
+installed, saying so. `enable` and `disable` refuse the tools, and a plugin
+named with no task. Run as root, a verb that changes the tools is refused
+unless `DESTDIR` or `PREFIX` is given.
+
 ### Getting the code
 
 **S11. `stable` is code every test passed.**
@@ -278,7 +292,7 @@ CI moves `stable` to a commit of `main` once every test passed on it, forward
 only; installing from `stable` installs tested code.
 
 **S12. The installer runs on every machine a plugin goes to.**
-`install.sh` and the tests keep to Xymon's portability rules, but the one
+`xymon-plugin` and the tests keep to Xymon's portability rules, but the one
 against Python, which every plugin needs, and the one against the
 `rrdtool` command, which the API runs to read the RRD files.
 
@@ -314,9 +328,10 @@ brings its test.
   server part keeps its runtime files in `XYMONRUNDIR` (S22) and its logs
   in Xymon's log directory. The checks under `checks/`, copied into place by hand today, each
   move under `plugins/` as a client part when they get a `PLUGIN` file.
-- **One command, read as a sentence.** `xymon-plugin`, at the top of the
-  repository, replaces `install.sh`, and takes a verb and the plugins it
-  acts on:
+- **One command, read as a sentence.** `xymon-plugin` (S24) takes a verb
+  and the plugins it acts on; still to come are `connect`, the target
+  detected rather than named, and the virtualenv made with no verb of its
+  own:
 
   ```sh
   ./xymon-plugin install xymonapi

@@ -3,7 +3,7 @@
 # xymond's files, with the Xymon environment below: no user or token. Off
 # once installed: it needs the Python modules in xymonapi-rag/requirements.txt,
 # and XYMONAPI_RAG_DOCS set in a file under xymonserver.d/; then
-# ./install.sh enable-server xymonapi-rag.
+# ./xymon-plugin enable --server xymonapi-rag.
 [xymonapi-rag]
 	ENVFILE @XYMONHOME@/etc/xymonserver.cfg
 	NEEDS xymonapi

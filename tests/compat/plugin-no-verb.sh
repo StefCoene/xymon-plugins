@@ -3,7 +3,7 @@
 #
 # tests/compat/plugin-no-verb.sh
 #
-# install.sh run with no verb and no terminal prints its usage, exits 2 and
+# xymon-plugin run with no verb and no terminal prints its usage, exits 2 and
 # changes nothing, settings given or not: a script that forgot its verb
 # installs, enables and removes nothing.
 #
@@ -17,13 +17,13 @@ set -euo pipefail
 ROOT=$(find_root)
 work=$(mktempdir)
 
-# no_verb LABEL [NAME=value...] -- run install.sh with no verb, and check.
+# no_verb LABEL [NAME=value...] -- run xymon-plugin with no verb, and check.
 no_verb() {
 	label=$1; shift
 	rc=0
-	"$ROOT/install.sh" "$@" </dev/null >"$work/$label.log" 2>&1 || rc=$?
+	"$ROOT/xymon-plugin" "$@" </dev/null >"$work/$label.log" 2>&1 || rc=$?
 	assert_equal 2 "$rc" "[S17] $label: exits 2"
-	assert_contains "usage: ./install.sh" "$(cat "$work/$label.log")" "[S17] $label: prints the usage"
+	assert_contains "usage: ./xymon-plugin" "$(cat "$work/$label.log")" "[S17] $label: prints the usage"
 	[ -z "$(ls -A "$work/home" "$work/prefix" "$work/man" 2>/dev/null)" ] \
 		|| fail "[S17] $label: changed something: $(ls -AR "$work/home" "$work/prefix" "$work/man" 2>/dev/null)"
 }
@@ -31,4 +31,4 @@ no_verb() {
 XYMONHOME=$work/home PREFIX=$work/prefix MANDIR=$work/man no_verb "no word"
 no_verb "settings only" XYMONHOME="$work/home" PREFIX="$work/prefix" MANDIR="$work/man"
 
-pass "install.sh with no verb and no terminal prints its usage, exits 2 and changes nothing"
+pass "xymon-plugin with no verb and no terminal prints its usage, exits 2 and changes nothing"

@@ -30,10 +30,12 @@ server_tree "$home"
 launch=$XYMON_SRC/common/xymonlaunch
 [ -x "$launch" ] || skip "xymonlaunch is not built in $XYMON_SRC"
 
-install() { "$ROOT/install.sh" install-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/$1.log" 2>&1 \
+# install LOG -- install, or update once installed: what an install again keeps.
+install() { v=install; [ -d "$home/ext/xymonapi" ] && v=update
+	"$ROOT/xymon-plugin" "$v" --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/$1.log" 2>&1 \
 	|| fail "install-server ($1) failed: $(tail -n 5 "$work/$1.log")"; }
 # enable-server, disable-server: run as $1, logged to $work/$1.log.
-switch() { "$ROOT/install.sh" "$1-server" xymonapi XYMONHOME="$home" >"$work/$1.log" 2>&1; }
+switch() { "$ROOT/xymon-plugin" "$1" --server xymonapi XYMONHOME="$home" >"$work/$1.log" 2>&1; }
 # The tasks xymonlaunch sees, as tasks.cfg reads tasks.d; its stderr apart.
 tasks() { "$launch" --config="$home/etc/tasks.cfg" --dump 2>"$work/dump.err" | grep '^\[' || true; }
 
@@ -74,7 +76,7 @@ assert_not_contains "[xymonapi]" "$seen" "[S9] xymonlaunch no longer has the tas
 other=$(grep -v 'Loading tasklist configuration' "$work/dump.err" || true)
 [ -z "$other" ] || fail "[S9] xymonlaunch complained about the link that points nowhere: $other"
 
-"$ROOT/install.sh" uninstall-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/uninstall.log" 2>&1 \
+"$ROOT/xymon-plugin" remove --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/uninstall.log" 2>&1 \
 	|| fail "uninstall-server after the removal by hand failed: $(tail -n 5 "$work/uninstall.log")"
 if [ -e "$link" ] || [ -L "$link" ]; then fail "[S9] uninstall-server left the link that pointed nowhere"; fi
 
@@ -88,13 +90,13 @@ install migrate
 cmp -s "$work/enabled" "$tf" || fail "[S6] the older install's task file was not moved as it was"
 assert_contains "moved to" "$(cat "$work/migrate.log")" "the install says it moved the task file"
 
-"$ROOT/install.sh" uninstall-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >/dev/null 2>&1
+"$ROOT/xymon-plugin" remove --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >/dev/null 2>&1
 awk '{ print } /^\[xymonapi\]$/ { print "\tDISABLED" }' "$work/enabled" > "$link"
 grep -q DISABLED "$link" || fail "the test's DISABLED copy has no DISABLED line"
 install migrate-off
 if [ -e "$link" ] || [ -L "$link" ]; then fail "[S13] an older install's DISABLED task file was left on"; fi
 grep -q DISABLED "$tf" && fail "[S13] the DISABLED line stayed in the moved task file"
-assert_contains "enable-server xymonapi" "$(cat "$work/migrate-off.log")" "[S13] the install says how to turn it on"
+assert_contains "enable --server xymonapi" "$(cat "$work/migrate-off.log")" "[S13] the install says how to turn it on"
 
 # A task file in ext/ with a DISABLED line and its link, as the install
 # before this one left it: off, the line taken out.
@@ -108,7 +110,7 @@ grep -q DISABLED "$tf" && fail "[S13] the DISABLED line stayed in the task file"
 # by renaming does when the admin edits the task through tasks.d: the file
 # xymonlaunch reads is the one kept, on, not the copy set aside, and a
 # second install finds nothing left to do.
-"$ROOT/install.sh" uninstall-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >/dev/null 2>&1
+"$ROOT/xymon-plugin" remove --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >/dev/null 2>&1
 install relink
 switch enable || fail "enable-server failed: $(cat "$work/enable.log")"
 { cat "$link"; echo '# the admin edit'; } > "$link.new"
@@ -122,13 +124,13 @@ if [ -e "$home/ext/.xymonapi.tasks.cfg" ]; then fail "[S6] the task file set asi
 install renamed-again
 cmp -s "$work/renamed" "$tf" || fail "[S6] a second install did not keep the edited task file"
 [ -L "$link" ] || fail "[S13] a second install turned the edited task off"
-"$ROOT/install.sh" uninstall-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >/dev/null 2>&1
+"$ROOT/xymon-plugin" remove --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >/dev/null 2>&1
 install before-foreign
 
 # A link to something else is left alone, by install and enable.
 ln -s /elsewhere "$link"
 rc=0
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/foreign.log" 2>&1 || rc=$?
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/foreign.log" 2>&1 || rc=$?
 [ "$rc" -ne 0 ] || fail "[S6] install-server over a link to something else succeeded"
 assert_file_exists "$tf"
 rc=0; switch enable || rc=$?
@@ -141,9 +143,9 @@ assert_equal /elsewhere "$(readlink "$link")" "[S6] the link to something else i
 
 # Staged for a package: the link names where the task file will be, not
 # where DESTDIR puts it.
-"$ROOT/install.sh" install-server xymonapi XYMONHOME=/usr/lib/xymon/server DESTDIR="$work/stage" MANDIR=/usr/share/man >"$work/stage.log" 2>&1 \
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME=/usr/lib/xymon/server DESTDIR="$work/stage" MANDIR=/usr/share/man >"$work/stage.log" 2>&1 \
 	|| fail "install-server with DESTDIR failed: $(tail -n 5 "$work/stage.log")"
-"$ROOT/install.sh" enable-server xymonapi XYMONHOME=/usr/lib/xymon/server DESTDIR="$work/stage" >"$work/stage-on.log" 2>&1 \
+"$ROOT/xymon-plugin" enable --server xymonapi XYMONHOME=/usr/lib/xymon/server DESTDIR="$work/stage" >"$work/stage-on.log" 2>&1 \
 	|| fail "enable-server with DESTDIR failed: $(tail -n 5 "$work/stage-on.log")"
 assert_equal /usr/lib/xymon/server/ext/xymonapi/tasks.cfg "$(readlink "$work/stage/usr/lib/xymon/server/etc/tasks.d/xymonapi")" \
 	"[S6] under DESTDIR the link names the installed task file"

@@ -42,7 +42,7 @@ server() {
 # output in $work/log.
 try() {
 	rc=0
-	"$ROOT/install.sh" install-server "$@" XYMONHOME="$h" MANDIR="$work/man" >"$work/log" 2>&1 || rc=$?
+	"$ROOT/xymon-plugin" install --server "$@" XYMONHOME="$h" MANDIR="$work/man" >"$work/log" 2>&1 || rc=$?
 }
 
 server 4.3.30

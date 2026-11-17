@@ -11,7 +11,7 @@ what builds on it.
 ```
 plugins/NAME/     one plugin: PLUGIN, README.md, its manual page, its code, tests/
 checks/NAME/      one check: its script, its clientlaunch.cfg stanza, README
-install.sh        installs, updates and removes the plugins, on either side
+xymon-plugin      installs, updates and removes the plugins, on either side
 tests/            how the plugins fit together (compat/), the eval set, helpers
 build/            CI's helpers: the contract check
 SPEC.md           the rules of the plugin model, each enforced by a test
@@ -24,7 +24,7 @@ and [`checks/README.md`](checks/README.md) list each kind:
 
 - a **plugin** is a directory under `plugins/` with a `PLUGIN` file, a
   README, a manual page, tests, and the code, versioned on its own and
-  installed with `install.sh`;
+  installed with `xymon-plugin`;
 - a **check** is a directory under `checks/`, a script with its
   `clientlaunch.cfg` stanza and a README, copied into place by hand. The
   checks are the older half, and move under `plugins/` as each gets a
@@ -59,12 +59,11 @@ move and how a change is made is in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Conventions
 
-- **Install actions** name the side: `install-server`, `enable-server`,
-  `disable-server`, `status-server`, `uninstall-server`, `venv-server` on the
-  Xymon server; `install-tools`, `status-tools`, `uninstall-tools`,
-  `venv-tools` on your own machine. `install-client` is refused, naming
-  `install-tools`: a client is Xymon's, on a monitored host, and the action
-  of that name arrives with the first check that installs there.
+- **`xymon-plugin`'s verbs** -- `install`, `update`, `enable`, `disable`,
+  `remove`, `status`, `venv` -- take the part they act on: `--server` on the
+  Xymon server, `--tools` on your own machine, alone. `--client` is refused
+  until a plugin has a client part: a client is Xymon's, on a monitored
+  host, and that part arrives with the first check that installs there.
 - **Manual pages.** Section 8 for what runs on the server, section 1 for the
   commands; every behaviour and setting is in the page, the README says how
   to install and use.
@@ -90,11 +89,11 @@ would bring.
 ## Installing
 
 ```sh
-XYMONHOME=/usr/lib/xymon/server ./install.sh install-server NAME   # on the Xymon server
-./install.sh install-tools NAME                                     # on your own machine
+XYMONHOME=/usr/lib/xymon/server ./xymon-plugin install --server NAME   # on the Xymon server
+./xymon-plugin install --tools NAME                                     # on your own machine
 ```
 
-With no `NAME`, every plugin of that side. What each command puts where,
+`--all` in place of `NAME`, every plugin of that part; `update` updates what is installed. What each command puts where,
 Python and the virtualenv, enabling, updating and uninstalling are in
 [`plugins/README.md`](plugins/README.md#installing-a-plugin); each plugin's
 README says only what is particular to it.

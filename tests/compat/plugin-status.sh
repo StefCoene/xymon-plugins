@@ -23,7 +23,7 @@ home=$work/server
 server_tree "$home"
 here=$(sed -n 's/^version: *//p' "$ROOT/plugins/xymonapi/PLUGIN")
 
-st() { "$ROOT/install.sh" status-server "$@" XYMONHOME="$home" 2>&1; }
+st() { "$ROOT/xymon-plugin" status --server "$@" XYMONHOME="$home" 2>&1; }
 
 # Each entry under $home with its own details, and no ".." line: on some
 # systems (macOS) the file written here beside $home changes its parent's.
@@ -32,7 +32,7 @@ assert_contains "xymonapi: not installed; this checkout has $here" "$(st)" "[S15
 find "$home" -exec ls -ld {} + | sort > "$work/after"
 cmp -s "$work/before" "$work/after" || fail "[S15] status changed the tree: $(diff "$work/before" "$work/after")"
 
-"$ROOT/install.sh" install-server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/install.log" 2>&1 \
+"$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/install.log" 2>&1 \
 	|| fail "install-server failed: $(tail -n 5 "$work/install.log")"
 find "$home" | sort > "$work/before"
 out=$(st)
@@ -41,7 +41,7 @@ assert_not_contains "newer" "$out" "[S15] nothing newer when the versions agree"
 find "$home" | sort > "$work/after"
 cmp -s "$work/before" "$work/after" || fail "[S15] status changed the installation: $(diff "$work/before" "$work/after")"
 
-"$ROOT/install.sh" enable-server xymonapi XYMONHOME="$home" >/dev/null 2>&1 || fail "enable-server failed"
+"$ROOT/xymon-plugin" enable --server xymonapi XYMONHOME="$home" >/dev/null 2>&1 || fail "enable-server failed"
 assert_contains "xymonapi: $here installed, on;" "$(st xymonapi)" "[S15] on once enabled"
 assert_equal 1 "$(st xymonapi | wc -l | tr -d ' ')" "[S15] a plugin named is the only one told of"
 
@@ -53,8 +53,8 @@ st no-such-plugin > "$work/bad" || rc=$?
 [ "$rc" -ne 0 ] || fail "[S15] status of a name that is no plugin succeeded"
 
 prefix=$work/tools
-"$ROOT/install.sh" install-tools xymonapi PREFIX="$prefix" >"$work/tools.log" 2>&1 || fail "install-tools failed: $(tail -n 5 "$work/tools.log")"
-out=$("$ROOT/install.sh" status-tools xymonapi PREFIX="$prefix" 2>&1)
+"$ROOT/xymon-plugin" install --tools xymonapi PREFIX="$prefix" >"$work/tools.log" 2>&1 || fail "install-tools failed: $(tail -n 5 "$work/tools.log")"
+out=$("$ROOT/xymon-plugin" status --tools xymonapi PREFIX="$prefix" 2>&1)
 assert_contains "xymonapi: $here installed; this checkout has $here" "$out" "[S15] status-tools: installed, its version, no on or off"
 
 pass "status-server and status-tools say what is installed, at which version, whether its task is on, and whether this checkout is newer, changing nothing"

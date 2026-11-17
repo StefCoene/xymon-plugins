@@ -1,13 +1,13 @@
 # What this plugin is, for the index in README.md and for whoever installs
 # it alone. One key per line, a key repeated for each line of a message;
-# ./install.sh at the repository's top installs it from the lines below.
+# ./xymon-plugin at the repository's top installs it from the lines below.
 name: xymonapi-rag
 version: 0.1.0
 summary: a search of Xymon's manual pages and history by meaning; the index task on the server, search and ask anywhere
 requires: xymonapi >= 0.1.0 (its client beside it; the API beside it on the server, over the network elsewhere), python >= 3.9
 manual: xymonapi-rag.1
 
-# How ./install.sh installs it: see xymonapi's PLUGIN file.
+# How ./xymon-plugin installs it: see xymonapi's PLUGIN file.
 server-needs: xymonapi
 tools-needs: xymonapi
 server-files: xymonrag.py xymonapi-rag.sh requirements.txt

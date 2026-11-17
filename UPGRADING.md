@@ -5,6 +5,19 @@ its version, what breaks, and what to do. Every other change needs nothing
 but installing the new code (see each plugin's README). CI refuses a change
 that breaks the API's contract without a line here.
 
+## install.sh becomes xymon-plugin, from November 2026
+
+The installer is `./xymon-plugin`, with a verb and the part it acts on:
+`install-server NAME` is `install --server NAME`, `install-tools` is
+`install --tools`, `uninstall-*` is `remove`, and so for `enable`,
+`disable`, `status` and `venv`; `install.sh` is gone, and each old action
+is refused, naming the new form. What breaks: a script that calls
+`install.sh`. Also: `install` and `remove` need a plugin named, or `--all`;
+`install` refuses a plugin installed already, which `update` replaces; a
+script names the part, `--server` or `--tools`; and the tools are refused
+as root unless `PREFIX` or `DESTDIR` is given. What is installed, and
+where, is unchanged.
+
 ## xymonapi-connect asks the password once more, from xymonapi 5.0.2
 
 `xymonapi-connect` now keeps the API's URL beside the token, in
@@ -99,7 +112,7 @@ reaches it, set `XYMONAPI_PASSWD=""` in a file under `xymonserver.d/`.
 
 A plugin's task is no longer turned on by removing `DISABLED` from its
 file: it is on when `etc/tasks.d/NAME` links to `ext/NAME/tasks.cfg`, which
-`XYMONHOME=... ./install.sh enable-server NAME` makes and `disable-server
+`XYMONHOME=... ./xymon-plugin enable --server NAME` makes and `disable-server
 NAME` removes. The first install with this version keeps each task as it
 was: one still `DISABLED` stays off and loses that line, and says how to
 turn it on; one you enabled stays on. A script that enabled a task by

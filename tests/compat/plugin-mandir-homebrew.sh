@@ -21,14 +21,14 @@ chmod 755 "$work/bin/brew"
 
 home=$work/brew/opt/xymon-server/server
 server_tree "$home"
-env -u MANDIR PATH="$work/bin:$PATH" "$ROOT/install.sh" install-server xymonapi XYMONHOME="$home" > "$work/install.log" 2>&1 \
+env -u MANDIR PATH="$work/bin:$PATH" "$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$home" > "$work/install.log" 2>&1 \
 	|| fail "install-server under Homebrew's prefix failed: $(tail -n 5 "$work/install.log")"
 [ -L "$work/brew/share/man/man8/xymonapi.8" ] || fail "the manual page is not under Homebrew's share/man"
 
 # Outside the prefix, MANDIR stays /usr/share/man: staged, to look.
 other=$work/other
 server_tree "$work/stage$other"
-env -u MANDIR PATH="$work/bin:$PATH" "$ROOT/install.sh" install-server xymonapi XYMONHOME="$other" DESTDIR="$work/stage" > "$work/other.log" 2>&1 \
+env -u MANDIR PATH="$work/bin:$PATH" "$ROOT/xymon-plugin" install --server xymonapi XYMONHOME="$other" DESTDIR="$work/stage" > "$work/other.log" 2>&1 \
 	|| fail "install-server outside the prefix failed: $(tail -n 5 "$work/other.log")"
 [ -L "$work/stage/usr/share/man/man8/xymonapi.8" ] || fail "outside Homebrew's prefix, the manual page is not under /usr/share/man"
 
