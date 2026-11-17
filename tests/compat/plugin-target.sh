@@ -86,7 +86,7 @@ server_tree "$s"; mkdir -p "$c/bin" "$c/etc"; : > "$c/bin/xymonclient.sh"; : > "
 echo "XYMONCLIENTHOME=\"$c\"" >> "$s/etc/xymonserver.cfg"
 rc=0; out=$(XYMONHOME="$c" "$ROOT/xymon-plugin" install --server xymonapi MANDIR="$man" </dev/null 2>&1) || rc=$?
 [ "$rc" -ne 0 ] || fail "[S25] a server's own client tree named was taken"
-assert_contains "is the client tree of the Xymon server $(cd "$s" && pwd -P)" "$out" "[S25] and the refusal names that server"
+assert_contains "is the client tree of the Xymon server $s:" "$out" "[S25] and the refusal names that server"
 
 # The current directory chooses nothing: from inside a tree, the same.
 rc=0; out=$(cd "$a" && "$ROOT/xymon-plugin" install --server xymonapi-agent MANDIR="$man" </dev/null 2>&1) || rc=$?

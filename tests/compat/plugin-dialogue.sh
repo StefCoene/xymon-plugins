@@ -33,11 +33,20 @@ assert_contains "Xymon server: $s" "$out" "[S27] the dialogue says where things 
 assert_contains "0) nothing" "$out" "[S27] nothing is offered, the default"
 assert_contains "Nothing done." "$out" "[S27] and Enter does nothing"
 [ -e "$s/ext/xymonapi" ] && fail "[S27] Enter at the menu installed something"
+menu=$out
+
+# n at the proposal: no Xymon part, and the dialogue goes on with the
+# person's tools.
+dialogue 'Use it? [Y/n] ' n 'What do you want to do? [0] ' ''
+[ "$rc" -eq 0 ] || fail "[S27] n at the proposal failed: $out"
+assert_contains "No Xymon server chosen" "$out" "[S27] n at the proposal is said"
+assert_contains "install xymonapi-mcp for you" "$out" "[S27] and the person's tools are still offered"
+assert_not_contains "install xymonapi on the server" "$out" "[S27] and nothing of the server"
 
 # The install of xymonapi chosen: the command printed and run, enabling
 # then offered as a second command, which Enter declines.
-k=$(printf '%s\n' "$out" | sed -n 's/^  \([0-9]*\)) install xymonapi on the server.*/\1/p')
-[ -n "$k" ] || fail "[S27] installing xymonapi is not offered: $out"
+k=$(printf '%s\n' "$menu" | sed -n 's/^  \([0-9]*\)) install xymonapi on the server.*/\1/p')
+[ -n "$k" ] || fail "[S27] installing xymonapi is not offered: $menu"
 dialogue 'Use it? [Y/n] ' '' 'What do you want to do? [0] ' "$k" 'Proceed? [Y/n] ' ''
 [ "$rc" -eq 0 ] || fail "[S27] the dialogue's install failed: $out"
 assert_contains "I will run:  XYMONHOME=$s $ROOT/xymon-plugin install --server xymonapi" "$out" "[S27] the command chosen is printed"
