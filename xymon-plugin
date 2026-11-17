@@ -434,7 +434,7 @@ $found}"
 	if [ "$n" -eq 1 ]; then
 		printf 'Xymon server: %s (detected). Use it? [Y/n] ' "$servers"
 		read -r ans || ans=n
-		case $ans in [Nn]*) die "no installation chosen: nothing done" ;; esac
+		case $ans in [Nn]*) none_chosen; return 1 ;; esac
 		XYMONHOME=$servers
 	else
 		conf=$(person_conf) || conf=
@@ -451,14 +451,18 @@ EOF2
 		printf 'Which one? [%s] ' "${def:-1-$n}"
 		read -r ans || ans=
 		[ -n "$ans" ] || ans=$def
-		case $ans in ''|*[!0-9]*) die "no installation chosen: nothing done" ;; esac
-		[ "$ans" -ge 1 ] && [ "$ans" -le "$n" ] || die "no installation $ans: nothing done"
+		case $ans in ''|*[!0-9]*) none_chosen; return 1 ;; esac
+		[ "$ans" -ge 1 ] && [ "$ans" -le "$n" ] || { none_chosen; return 1; }
 		XYMONHOME=$(printf '%s\n' "$servers" | sed -n "${ans}p")
 	fi
 	CHOSEN="detected, confirmed"
 	mandir
 	server_paths
 }
+
+# none_chosen -- no installation taken at the proposal: a verb stops there,
+# changing nothing; the dialogue, SOFT set, goes on with the person's tools.
+none_chosen() { [ -n "${SOFT:-}" ] || die "no installation chosen: nothing done"; }
 
 # remember_tree -- XYMONHOME as the one used last, for the person who typed
 # the command; not under sudo, which reads it only.
@@ -1175,7 +1179,8 @@ install_tools() {
 	fi
 	manual "$1" "$(field "$1" tools-manual)" "$dir" "$PREFIX/share/man" "$PREFIX/libexec/xymon-plugins/$1"
 	venv_auto "$1" "$TOOLSROOT" "$(field "$1" tools-modules)" --tools "$(field "$1" venv-note)"
-	echo "Installed $1 $(sed -e 's|^.*/v||' "$dir/VERSION") in $PREFIX/libexec/xymon-plugins/$1."
+	if [ -n "${UPDATING:-}" ]; then w=Updated; else w=Installed; fi
+	echo "$w $1 $(sed -e 's|^.*/v||' "$dir/VERSION") in $PREFIX/libexec/xymon-plugins/$1."
 	# Said once, and not under DESTDIR, where PATH is the build machine's.
 	if [ -n "$(field "$1" command)" ] && [ -z "$DESTDIR" ] && [ -z "${PATHSAID:-}" ]; then
 		case ":$PATH:" in *":$PREFIX/bin:"*) ;; *) echo "The commands are in $PREFIX/bin, which is not on PATH: add it."; PATHSAID=1 ;; esac
@@ -1192,7 +1197,7 @@ needed() {
 		[ -d "$p" ] || continue
 		ns=$(needs "${p##*/}" "$2" "$3") || exit 1
 		case " $ns " in
-			*" $1 "*) die "$1 is needed by ${p##*/}, installed in $3: uninstall ${p##*/} first" ;;
+			*" $1 "*) die "$1 is needed by ${p##*/}, installed in $3: remove ${p##*/} first" ;;
 		esac
 	done
 	return 0
@@ -1307,8 +1312,12 @@ installed() { [ -f "$1/$2/VERSION" ] && sed -e 's|^.*/v||' "$1/$2/VERSION"; }
 dialogue() {
 	me=$0
 	if [ -n "$XYMONHOME" ] || [ -n "$(xymon_trees | sed -n 's/^server //p')" ]; then
-		[ -n "$XYMONHOME" ] || choose_tree
-		server_paths
+		if [ -z "$XYMONHOME" ]; then
+			SOFT=1
+			choose_tree || { XYMONHOME=; echo "No Xymon server chosen: what follows is your tools'."; }
+			SOFT=
+		fi
+		[ -z "$XYMONHOME" ] || server_paths
 	fi
 	echo
 	if [ -n "$XYMONHOME" ]; then

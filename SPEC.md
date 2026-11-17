@@ -273,7 +273,8 @@ script that forgot its verb installs, enables and removes nothing.
 
 **S27. With no verb on a terminal, the command shows, then offers.**
 Run with no verb, its input and its output on a terminal, it says what it
-found: the Xymon installation, by S25, each plugin installed there with
+found: the Xymon installation, by S25 -- declined, the dialogue goes on
+with the person's tools alone -- each plugin installed there with
 its version and, for one with a task, whether it is on, and the person's
 tools. It then offers only what applies, one line each: install a plugin
 on the server, with what it does and the plugins it needs named; turn one

@@ -18,7 +18,11 @@ is refused, naming the new form. What breaks: a script that calls
 script names the part, `--server` or `--tools`; and the tools are refused
 as root unless `PREFIX` or `DESTDIR` is given; off a terminal, modules are
 fetched only with `--venv`; `enable` refuses a plugin whose Python lacks
-its modules. What is installed, and where, is unchanged.
+its modules. What is installed, and where, is unchanged. A plugin
+installed before reads as needing nothing, as its copy of `PLUGIN` has
+`needs:`, not `server-needs:` or `tools-needs:`: `remove --all` then
+removes in no set order, which is harmless when all go; to remove one
+alone, update first.
 
 ## xymonapi-connect asks the password once more, from xymonapi 5.0.2
 

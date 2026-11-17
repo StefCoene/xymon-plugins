@@ -20,4 +20,4 @@ tools-manual: xymonapi-agent.1
 command: xymonapi-agent xymonapi-agent.sh
 executable: xymonapi-agent.sh
 installed-tools: It reads the API xymonapi-mcp register connected this machine to, or XYMONAPI_URL: then xymonapi-agent doctor.
-uninstalled-tools: Uninstalled xymonapi-agent. Kept: xymonapi-mcp, xymonapi's client, and its sessions under $XDG_STATE_HOME/xymonapi-agent.
+uninstalled-tools: Uninstalled xymonapi-agent. Its sessions stay under $XDG_STATE_HOME/xymonapi-agent, and xymonapi-mcp and xymonapi's client unless removed with it.

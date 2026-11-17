@@ -209,6 +209,7 @@ mkdir -p "$prefix/libexec/xymon-plugins/venv" && : > "$prefix/libexec/xymon-plug
 "$ROOT/xymon-plugin" update --tools PREFIX="$prefix" >"$work/client2.log" 2>&1 \
 	|| fail "xymon-plugin install --tools a second time failed: $(tail -n 5 "$work/client2.log")"
 [ -e "$prefix/libexec/xymon-plugins/xymonapi-rag/gone.py" ] && fail "a file no longer shipped stayed in the client's xymonapi-rag"
+assert_contains "Updated xymonapi-rag " "$(cat "$work/client2.log")" "[S24] update says it updated, not installed"
 assert_file_exists "$prefix/libexec/xymon-plugins/venv/kept"
 for f in xymonapi-mcp/server.py xymonapi-mcp/xymonapi-mcp.sh xymonapi/xymonapi_client.py xymonapi/xymonapi-connect.sh \
          xymonapi-rag/xymonrag.py xymonapi-rag/xymonapi-rag.sh xymonapi-rag/requirements.txt xymonapi-mcp/VERSION xymonapi-rag/VERSION; do
