@@ -262,7 +262,10 @@ the command.
 those named: whether it is installed, the version installed, from its
 `VERSION`, a release tag read as its `X.Y.Z`; on the server, whether its
 task is on; and the version of the checkout run from, marked newer when it
-is. A name that is no plugin is refused. `status` changes nothing.
+is. A name that is no plugin is refused. `status` changes nothing. It
+says them by section, each always there, empty or not: the Xymon server,
+its own client tree -- the one its `XYMONCLIENTHOME` names -- and the
+person's tools; `--server` and `--tools` keep to theirs.
 
 ### Running the command
 
@@ -276,11 +279,14 @@ Run with no verb, its input and its output on a terminal, it says what it
 found: the Xymon installation, by S25 -- declined, the dialogue goes on
 with the person's tools alone -- each plugin installed there with
 its version and, for one with a task, whether it is on, and the person's
-tools. It then offers only what applies, one line each: install a plugin
-on the server, with what it does and the plugins it needs named; turn one
+tools, each in its section, the server's client too. It then offers only
+what applies, one line each, the plugins others need first: install a
+plugin on the server, with what that part does, by the `server-short:`
+line of its `PLUGIN`, and the plugins it needs named; turn one
 on or off; update the server's plugins; remove one that no installed
-plugin needs; install a plugin's tools; update them; or nothing, the
-default, Enter. It prints the command those answers spell, asks
+plugin needs; install a plugin's tools, said by its `tools-short:` line;
+update them; or nothing, the default, Enter. It prints the command those
+answers spell, the installation in it by `--xymon-home`, asks
 `Proceed? [Y/n]`, runs exactly that command and nothing else, and stops;
 after an install of a plugin with a task it offers enabling as a second
 command, printed and asked with `[y/N]`, so that Enter declines it (S5).
@@ -298,7 +304,10 @@ named, or `--all`. `install` refuses a plugin installed already, and
 `update` one that is not; `--all`, and a plugin one needs, pass over those
 installed, saying so. `enable` and `disable` refuse the tools, and a plugin
 named with no task. Run as root, a verb that changes the tools is refused
-unless `DESTDIR` or `PREFIX` is given.
+unless `DESTDIR` or `PREFIX` is given. `--server` with `--tools` is refused,
+`status` saying that it shows both with neither, another verb giving the
+two commands to run. `update` says what it updated, without the help a
+first install gives.
 
 **S25. A run changes one Xymon installation, named or confirmed.**
 `XYMONHOME`, or `--xymon-home PATH`, which wins when both are given, names

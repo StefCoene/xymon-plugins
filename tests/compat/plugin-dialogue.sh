@@ -34,6 +34,9 @@ assert_contains "0) nothing" "$out" "[S27] nothing is offered, the default"
 assert_contains "Nothing done." "$out" "[S27] and Enter does nothing"
 [ -e "$s/ext/xymonapi" ] && fail "[S27] Enter at the menu installed something"
 menu=$out
+assert_contains "1) install xymonapi on the server: the HTTP API" "$menu" "[S27] the plugins others need come first, each said in a few words"
+assert_contains "Its client" "$menu" "[S27] the server's client has its section"
+assert_contains "Your tools, $work/prefix:" "$menu" "[S27] and so have the person's tools"
 
 # n at the proposal: no Xymon part, and the dialogue goes on with the
 # person's tools.
@@ -49,7 +52,7 @@ k=$(printf '%s\n' "$menu" | sed -n 's/^  \([0-9]*\)) install xymonapi on the ser
 [ -n "$k" ] || fail "[S27] installing xymonapi is not offered: $menu"
 dialogue 'Use it? [Y/n] ' '' 'What do you want to do? [0] ' "$k" 'Proceed? [Y/n] ' ''
 [ "$rc" -eq 0 ] || fail "[S27] the dialogue's install failed: $out"
-assert_contains "I will run:  XYMONHOME=$s $ROOT/xymon-plugin install --server xymonapi" "$out" "[S27] the command chosen is printed"
+assert_contains "I will run:  $ROOT/xymon-plugin install --server --xymon-home $s xymonapi" "$out" "[S27] the command chosen is printed, the installation by --xymon-home"
 assert_file_exists "$s/ext/xymonapi/VERSION"
 assert_contains "Turn it on now?" "$out" "[S27] after the install, enabling is offered"
 assert_contains "xymonapi stays off" "$out" "[S27] and Enter declines it"
