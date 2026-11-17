@@ -45,7 +45,11 @@ README says only what is particular to it. A plugin has up to two parts, the
 Xymon server's and your own machine's ([Where things run](../README.md#where-things-run)),
 and you install the one the machine plays: a verb, then `--server` or
 `--tools`, which goes alone. Without one, on a terminal, the server part is
-meant, and said; in a script, name it. `--client` is refused: a client here
+meant, and said; in a script, name it. The Xymon installation is
+`XYMONHOME`, or `--xymon-home PATH`, which wins; on a terminal it may be
+left out: the server found is proposed, or, with several, the one used
+last, and the command says which it acts on before it changes anything.
+`--client` is refused: a client here
 is Xymon's, on a monitored host, and no plugin has a part there yet.
 
 | side | where, as whom | command | puts |

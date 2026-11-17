@@ -285,6 +285,26 @@ installed, saying so. `enable` and `disable` refuse the tools, and a plugin
 named with no task. Run as root, a verb that changes the tools is refused
 unless `DESTDIR` or `PREFIX` is given.
 
+**S25. A run changes one Xymon installation, named or confirmed.**
+`XYMONHOME`, or `--xymon-home PATH`, which wins when both are given, names
+it, checked against its marks (S18); running under `xymoncmd`, which sets
+it, counts as naming it. Not named, on a terminal, the installations found
+are proposed: the one server found, Enter for yes; several, listed, the
+one used last as the default, said when it is gone, and none otherwise.
+Detection reads the packages' usual paths, Homebrew's, the trees of a
+running `xymonlaunch` and the `xymon` user's home, not the current
+directory; it compares trees by their resolved path, and tells a client
+tree a server found names as its own as part of that server. Off a
+terminal, not named, a verb that changes something is refused, listing the
+trees found; `status` lists every installation found and what it holds,
+and never asks. A `XYMONHOME` that is a server's own client tree -- the
+`../server` beside it, or a server found, naming it as its
+`XYMONCLIENTHOME` -- is refused, naming that server. Before anything
+changes, the run says the target, the part, and what chose them: named, or
+detected and confirmed. The installation chosen is remembered, as the one
+used last, in the person's `$XDG_CONFIG_HOME/xymon-plugin/`; under `sudo`
+it is read from `SUDO_USER`'s and not written.
+
 ### Getting the code
 
 **S11. `stable` is code every test passed.**
@@ -399,40 +419,12 @@ brings its test.
   own rules (above, below). A refusal comes before
   anything changes. A machine with no Xymon installation installs no Xymon
   part, and says that the tools are installed with `--tools` or `connect`.
-- **A run changes one Xymon installation, which `XYMONHOME` names.**
-  An installation is a Xymon tree, a server's, marked by
-  `etc/xymonserver.cfg` and `bin/xymond`, with its own client tree, or a
-  standalone client's, marked by `etc/xymonclient.cfg` and
-  `bin/xymonclient.sh`. A machine may hold several installations, and a run
-  changes one; `status` may read them all. `XYMONHOME`, or `--xymon-home PATH`, is the only thing that
-  chooses it without asking -- running under `xymoncmd`, which sets it, counts as naming
-  it; `--xymon-home` wins when both are given, which the first line says --
-  and it is checked against its marks (S18). A `XYMONHOME` that is the
-  client tree of a server found by detection stops the run. The message
-  names that server, and the command to type: `--xymon-home` its tree, and
-  `--client`. A client tree is a server's own when the `server` tree beside
-  it, `../server`, names it as its `XYMONCLIENTHOME`; where that is in
-  doubt -- `../server` there but naming another, or a server's
-  `xymonlaunch` running -- the command asks whether it is a standalone
-  client. Detection -- the trees of a running `xymonlaunch`, the packages'
-  usual paths, the `xymon` user's home, not the current directory -- only
-  proposes. Trees are compared by their resolved path -- one tree may be
-  reached by several, as Homebrew's `opt/` and `Cellar/` -- and a client
-  tree a found server names is part of that server, not another
-  installation. On a terminal, without a name, with a verb other than
-  `status` or with none,
-  the one installation found is proposed, and the person confirms, Enter
-  for yes -- for `--tools` and `connect --tools` too, whose dialogue then
-  offers that installation's local socket as the API's URL; several are listed, with as default the one used last, else none:
-  neither the current directory nor what runs at that moment chooses it. Off a terminal, without
-  a name, a verb that changes a Xymon part is refused, listing the trees
-  found: a script's target depends neither on its current directory nor
-  on what runs at that moment. `status` then lists the trees, what each
-  holds, and the person's tools. Every
-  run says, before it changes anything, the target, the parts, and what
-  chose them: named, or detected and confirmed. As decided in #39, no record of the target is written
-  in an installed part, which keeps only its `PLUGIN` and `VERSION`; the
-  one used last is remembered apart (below).
+- **A run changes one Xymon installation (S25)**; still to come: the
+  doubt whether a client tree is a server's own -- `../server` there but
+  naming another, or a server's `xymonlaunch` running -- which the command
+  asks once a plugin has a client part; and, for `--tools` and
+  `connect --tools`, the installation proposed too, whose local socket the
+  dialogue offers as the API's URL.
 - **With no verb on a terminal, the command shows where things stand, then
   offers what applies.** Run with no verb, its input and its output on a
   terminal, it first says what it found: the Xymon installation, by the
