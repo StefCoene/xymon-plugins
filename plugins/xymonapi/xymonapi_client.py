@@ -9,7 +9,7 @@ socket, XYMONAPI_SOCKET or $XYMONRUNDIR/xymonapi/local/api.sock
 ($XYMONSERVERLOGS when XYMONRUNDIR is empty), when the file is
 there -- the plugins' tasks on the server have both settings -- then the
 API `xymonapi-connect URL` last connected this user to, kept in
-~/.config/xymon-api/xymon.url, with its token and CA beside it, each unless
+~/.config/xymonapi/xymon.url, with its token and CA beside it, each unless
 set; and http://127.0.0.1:1986 otherwise.
 XYMONAPI_TOKEN_FILE names a file holding a client token -- the one
 xymonapi-connect(1) keeps -- sent when the API asks for a user: the token
@@ -42,7 +42,7 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlencode, urlsplit
 
 
-CONF = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "xymon-api"
+CONF = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "xymonapi"
 
 
 def _kept_url(name: str = "xymon") -> str:

@@ -62,7 +62,7 @@ assert_contains "xymonapi stays off" "$out" "[S27] and Enter declines it"
 dialogue 'Use it? [Y/n] ' '' 'What do you want to do? [0] ' ''
 assert_contains "turn xymonapi on" "$out" "[S27] only what applies is offered: turning it on"
 assert_not_contains "install xymonapi on the server" "$out" "[S27] not installing it again"
-assert_contains "xymonapi 5" "$out" "[S27] and the plugin installed is listed with its version"
+assert_contains "xymonapi $(sed -n 's/^version: //p' "$ROOT/plugins/xymonapi/PLUGIN")" "$out" "[S27] and the plugin installed is listed with its version"
 
 # Off a terminal, no verb: the usage, nothing done (S17).
 rc=0; "$ROOT/xymon-plugin" </dev/null >"$work/usage.log" 2>&1 || rc=$?

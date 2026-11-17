@@ -1,4 +1,4 @@
-.TH XYMONAPI-CONNECT 1 "November 16, 2026" "xymon-plugins"
+.TH XYMONAPI-CONNECT 1 "November 17, 2026" "xymon-plugins"
 .SH NAME
 xymonapi-connect \- connect this machine to the Xymon API
 .SH SYNOPSIS
@@ -23,13 +23,13 @@ otherwise, when the API asks for a password, asks for a user of the API
 (XYMONAPI_USER when set) and the password once, on the terminal, or as two
 lines on stdin when stdin is not one; gets with them a token for this
 machine, named by its short hostname; and writes it to
-~/.config/xymon-api/NAME.token, mode 600. The password is not kept;
+~/.config/xymonapi/NAME.token, mode 600. The password is not kept;
 .IP 4. 4
 says when the API and this client run different versions of xymonapi, and
 who can act on it: the server's admin when the API is the older, this
 machine when the client is;
 .IP 5. 4
-keeps the URL in ~/.config/xymon-api/NAME.url, which a client given no
+keeps the URL in ~/.config/xymonapi/NAME.url, which a client given no
 XYMONAPI_URL reads for the name xymon, with the token and certificate
 beside it;
 .IP 6. 4
@@ -49,7 +49,7 @@ URL asks none, it removes the token kept for the old one, which that
 server's /tokens revokes. The URL is kept as soon as a token is: a run
 that fails after the API issued it leaves that URL the default, with its
 token, rather than the one before. Messages go to stderr. A password file an earlier setup
-kept, ~/.config/xymon-api/NAME.password, is removed.
+kept, ~/.config/xymonapi/NAME.password, is removed.
 
 NAME, xymon by default, tells one API from another: each has its own token
 file. The API's /tokens lists this user's machines and revokes one.
@@ -70,7 +70,7 @@ Letters, digits, '.', '_' and '-', 64 at most.
 The user of the API, not asked.
 .IP "\fBXYMONAPI_CA\fR"
 The certificate, or the CA, to trust for an https:// URL. The default is
-~/.config/xymon-api/NAME-ca.pem when that file exists: copy the server's
+~/.config/xymonapi/NAME-ca.pem when that file exists: copy the server's
 certificate there, over a channel already trusted. Verification is never
 turned off.
 .IP "\fBXYMONAPI_PYTHON\fR"
@@ -80,7 +80,7 @@ makes, when there is one; else the first of python3, python3.14 down to
 python3.9, found on PATH. Nothing is
 asked: this program needs no module beyond the standard library.
 .IP "\fBXDG_CONFIG_HOME\fR"
-Where xymon-api/ is, ~/.config by default.
+Where xymonapi/ is, ~/.config by default.
 
 .SH "EXIT STATUS"
 0 when this machine is connected; 1 when the API cannot be reached, its

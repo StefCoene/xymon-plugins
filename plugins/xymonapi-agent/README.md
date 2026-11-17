@@ -52,7 +52,7 @@ xymonapi-agent doctor                     # one question through the tools
 
 `register` is `xymonapi-mcp`'s: it connects this machine to the API with
 your password once, for a token of its own, and keeps the API's URL beside
-the token, in `~/.config/xymon-api/`, where this command and `xymonapi-rag`
+the token, in `~/.config/xymonapi/`, where this command and `xymonapi-rag`
 read it when `XYMONAPI_URL` is not set. For a second server, set
 `XYMONAPI_URL`, `XYMONAPI_TOKEN_FILE` and `XYMONAPI_CA` as
 `xymonapi-connect URL NAME` prints them, or write a profile. What it also registers with Claude Code and
@@ -105,7 +105,7 @@ backend = ["claude", "opencode"]        # tried in order
 site = "lab"
 [env]
 XYMONAPI_URL = "https://xymon-lab.example.ch"
-XYMONAPI_TOKEN_FILE = "~/.config/xymon-api/xymon-lab.token"
+XYMONAPI_TOKEN_FILE = "~/.config/xymonapi/xymon-lab.token"
 ```
 
 ```toml
