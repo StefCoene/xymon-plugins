@@ -30,6 +30,10 @@ server_tree "$home"
 launch=$XYMON_SRC/common/xymonlaunch
 [ -x "$launch" ] || skip "xymonlaunch is not built in $XYMON_SRC"
 
+# enable refuses a plugin whose Python lacks its modules: a stand-in that
+# has every one, as xymonlaunch here only reads the tasks.
+printf '#!/bin/sh\nexit 0\n' > "$work/haspy"; chmod 755 "$work/haspy"
+export XYMONAPI_PYTHON="$work/haspy"
 # install LOG -- install, or update once installed: what an install again keeps.
 install() { v=install; [ -d "$home/ext/xymonapi" ] && v=update
 	"$ROOT/xymon-plugin" "$v" --server xymonapi XYMONHOME="$home" MANDIR="$work/man" >"$work/$1.log" 2>&1 \

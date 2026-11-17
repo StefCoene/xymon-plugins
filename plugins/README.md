@@ -81,9 +81,13 @@ the server and `libexec/xymon-plugins/venv` elsewhere, pinning that
 interpreter and fetching nothing. When no Python has them, or the virtualenv
 there lacks some, the install run from a terminal offers to make or complete
 it, installing the modules from PyPI -- the one virtualenv of that side,
-with the modules of every plugin installed there; without a terminal, or
-answered no, it says so, and `XYMONHOME=... ./xymon-plugin venv --server PYTHON=...` on the
-server, or `./xymon-plugin venv --tools PYTHON=...` elsewhere, does it later. The
+with the modules of every plugin installed there; without a terminal, it
+fetches only when `--venv` is given, and otherwise says so: `update
+--server --venv` on the server, or `update --tools --venv` elsewhere, does
+it later, with `PYTHON=...` to name the Python to make it from. Under
+`DESTDIR` none is made. There is no verb of its own for it. `enable`
+refuses a plugin whose Python lacks its modules, naming what makes them,
+and `status` says so. The
 launchers run with `XYMONAPI_PYTHON` when it is set, else with that
 virtualenv, else with the `python3` on PATH, asking nothing; a command that
 then needs a module it lacks says which, and what installs it.

@@ -62,7 +62,7 @@ refused "a tree with no marks" "$work/bare" "none of etc/xymonserver.cfg bin/xym
 [ -e "$man" ] && fail "[S18] a tree with no marks: a manual page was installed"
 # Every server action, named or not, is refused the same.
 find "$work/bare" | sort > "$work/before"
-for a in install-server enable-server disable-server status-server uninstall-server venv-server; do
+for a in install-server enable-server disable-server status-server uninstall-server; do
 	for p in xymonapi ""; do
 		rc=0
 		all=; [ -n "$p" ] || case $a in install-*|uninstall-*) all=--all ;; esac

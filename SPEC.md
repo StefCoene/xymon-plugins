@@ -305,6 +305,17 @@ detected and confirmed. The installation chosen is remembered, as the one
 used last, in the person's `$XDG_CONFIG_HOME/xymon-plugin/`; under `sudo`
 it is read from `SUDO_USER`'s and not written.
 
+**S26. The Python environment comes with install and update.**
+There is no verb for it: `install` and `update` make or complete the
+virtualenv beside the plugins a plugin's modules need. On a terminal they
+ask before fetching modules from PyPI; off one they fetch none unless
+`--venv` is given, and say how to make it; `PYTHON=` names a Python that
+has the modules already, from which it is made with nothing fetched; under
+`DESTDIR` none is made or used (S21). One that cannot be made does not fail
+the install, which says how to make it. `enable` refuses a plugin whose
+Python -- `XYMONAPI_PYTHON`, else that virtualenv, else `python3` -- lacks
+the modules it needs, naming what makes them, and `status` says so.
+
 ### Getting the code
 
 **S11. `stable` is code every test passed.**
@@ -349,9 +360,7 @@ brings its test.
   in Xymon's log directory. The checks under `checks/`, copied into place by hand today, each
   move under `plugins/` as a client part when they get a `PLUGIN` file.
 - **One command, read as a sentence.** `xymon-plugin` (S24) takes a verb
-  and the plugins it acts on; still to come are `connect`, the target
-  detected rather than named, and the virtualenv made with no verb of its
-  own:
+  and the plugins it acts on; still to come is `connect`:
 
   ```sh
   ./xymon-plugin install xymonapi
@@ -368,15 +377,8 @@ brings its test.
   or `--all`. `install` refuses a plugin already installed, and `update`
   one that is not: once built, `update` does what S7 says of installing
   again.
-  The Python environment a plugin needs is made and completed by `install`
-  and `update`, with no verb of its own. On a terminal they ask before
-  fetching modules; off a terminal they fetch none, unless `--venv` allows
-  it, and say how to make it; under `DESTDIR` none is made or used, whatever `--venv` or `PYTHON=` says (S21).
-  `PYTHON=` names a Python that has the modules already, from which the
-  environment is made with nothing fetched. An environment that cannot be made does not
-  fail the install, which says how to make it. `enable`
-  refuses a plugin whose Python lacks the modules it needs, and `status`
-  says so. It is POSIX `sh` and needs no `make`.
+  The Python environment a plugin needs is S26's. It is POSIX `sh` and
+  needs no `make`.
 - **`connect URL` links a part to a source.** With no selector it means
   `--tools`, unlike the other verbs. For the person's tools it links their session to an API: one plugin's
   `PLUGIN` has a `connect:` line, `xymonapi`'s, which gets the token, the

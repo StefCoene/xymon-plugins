@@ -107,7 +107,7 @@ as a list, and `environment` for `env`.
   credential sent. Leave it out when the API asks for no password.
 - Add `XYMONAPI_CA` when the server's certificate is its own, and
   `XYMONAPI_PYTHON` when the `python3` on `PATH` is older than 3.9 and no
-  virtualenv sits beside the plugins (`./xymon-plugin venv --tools` makes one).
+  virtualenv sits beside the plugins (`./xymon-plugin update --tools --venv` makes one).
 - For two Xymon servers, register twice, as `xymon-prod` and `xymon-lab`,
   each with its own URL and token file.
 

@@ -52,22 +52,25 @@ ROOT=$(cd "$(dirname "$0")" && pwd)
 
 die() { printf 'xymon-plugin: %s\n' "$*" >&2; exit 1; }
 usage() {
-	echo "usage: ./xymon-plugin install|update|enable|disable|remove|status|venv [--server|--tools] [--all] [--force] [PLUGIN...] [NAME=value...]" >&2
+	echo "usage: ./xymon-plugin install|update|enable|disable|remove|status [--server|--tools] [--all] [--venv] [--force] [--xymon-home PATH] [PLUGIN...] [NAME=value...]" >&2
 	exit 2
 }
 
 [ $# -ge 1 ] || usage
 VERB=$1; shift
 case $VERB in
-	install|update|enable|disable|remove|status|venv) ;;
+	install|update|enable|disable|remove|status) ;;
+	venv) die "venv is now part of install and update: ./xymon-plugin update --server --venv, or --tools --venv" ;;
 	install-server|install-tools|uninstall-server|uninstall-tools|enable-server|disable-server|status-server|status-tools|venv-server|venv-tools)
 		v=${VERB%-*}; [ "$v" = uninstall ] && v=remove
+		[ "$v" = venv ] && die "$VERB is now: ./xymon-plugin update --${VERB##*-} --venv"
 		die "$VERB is now: ./xymon-plugin $v --${VERB##*-}" ;;
 	*-client) die "$VERB: a client, here, is Xymon's, on a monitored host, and no plugin has a client part yet" ;;
 	*) usage ;;
 esac
 NAMES=
 FORCE=
+VENV_FETCH=
 ALL=
 SEL_SERVER=
 SEL_TOOLS=
@@ -79,6 +82,7 @@ while [ $# -gt 0 ]; do
 		--xymon-home=*) XH_OPT=${a#--xymon-home=} ;;
 		--xymon-home) [ $# -gt 0 ] || usage; XH_OPT=$1; shift ;;
 		--force) FORCE=1 ;;
+		--venv) VENV_FETCH=1 ;;
 		--all) ALL=1 ;;
 		--server) SEL_SERVER=1 ;;
 		--tools) SEL_TOOLS=1 ;;
@@ -729,13 +733,19 @@ status() {
 	if [ "$1" = server ] && [ -n "$(held "$2" "$3" task)" ]; then
 		if [ -L "$TASKDIR/$3" ]; then state=", on"; else state=", off"; fi
 	fi
+	# A server part whose Python lacks its modules is said, as enable
+	# refuses it.
+	lack=
+	if [ "$1" = server ]; then
+		m=$(missing_modules "$3"); [ -z "$m" ] || lack="; its Python lacks $m"
+	fi
 	if [ -z "$here" ]; then
-		echo "$3: $v installed$state; not in this checkout"
+		echo "$3: $v installed$state$lack; not in this checkout"
 		return 0
 	fi
 	newer=
 	older "$v" "$here" && newer=", newer"
-	echo "$3: $v installed$state; this checkout has $here$newer"
+	echo "$3: $v installed$state$lack; this checkout has $here$newer"
 }
 
 # installed_tasks -- the plugins named, or every one installed with a task.
@@ -940,6 +950,24 @@ restart() {
 	fi
 }
 
+# fetch_ok QUESTION -- true when fetching modules from PyPI is allowed:
+# --venv given, or, on a terminal, QUESTION answered y.
+fetch_ok() { [ -n "$VENV_FETCH" ] || offer "$1"; }
+
+# missing_modules PLUGIN -- the server modules its PLUGIN copy names that
+# the Python its launcher runs with lacks: XYMONAPI_PYTHON, else the
+# virtualenv beside the plugins, else python3. Nothing under DESTDIR, where
+# no Python of the installed system is there to ask.
+missing_modules() {
+	[ -z "$DESTDIR" ] || return 0
+	mods=$(held "$EXTROOT" "$1" server-modules)
+	[ -n "$mods" ] || return 0
+	py=${XYMONAPI_PYTHON:-}
+	[ -n "$py" ] || { [ -x "$EXTROOT/venv/bin/python3" ] && py=$EXTROOT/venv/bin/python3; } || py=python3
+	"$py" -c 'import importlib.util as u, sys; print(" ".join(m for m in sys.argv[1:] if u.find_spec(m) is None))' $mods 2>/dev/null \
+		|| echo "$mods"
+}
+
 # offer QUESTION -- on a terminal, ask it; true on y. Without one, false.
 offer() {
 	[ -t 0 ] && [ -t 1 ] || return 1
@@ -966,16 +994,16 @@ venv_auto() {
 	plugin=$1 root=$2 modules=$3 target=$4 note=$5
 	[ -n "$modules" ] || return 0
 	if [ -n "$DESTDIR" ]; then
-		echo "Under DESTDIR no virtualenv is made or used: on the installed system, ./xymon-plugin venv $target makes one for $plugin's modules ($modules)."
+		echo "Under DESTDIR no virtualenv is made or used: on the installed system, ./xymon-plugin update $target --venv makes one for $plugin's modules ($modules)."
 		return 0
 	fi
 	if [ -x "$root/venv/bin/python3" ]; then
 		missing=$("$root/venv/bin/python3" -c 'import importlib.util as u, sys; print(" ".join(m for m in sys.argv[1:] if u.find_spec(m) is None))' $modules)
 		[ -z "$missing" ] && return 0
-		if offer "The virtualenv $root/venv lacks $missing, which $plugin needs${note:+ ($note)}. Install them into it, from PyPI?"; then
-			"$ROOT/xymon-plugin" venv "$target" || exit 1
+		if fetch_ok "The virtualenv $root/venv lacks $missing, which $plugin needs${note:+ ($note)}. Install them into it, from PyPI?"; then
+			venv "$root"
 		else
-			echo "The virtualenv $root/venv lacks $missing, which this plugin needs: ./xymon-plugin venv $target installs them."
+			echo "The virtualenv $root/venv lacks $missing, which this plugin needs: ./xymon-plugin update $target --venv installs them."
 		fi
 		return 0
 	fi
@@ -1006,10 +1034,10 @@ venv_auto() {
 			return 0
 		fi
 		echo "Made $root/venv from $py ($("$py" -V 2>&1)), which has the modules this plugin needs ($modules): the plugins there run with it."
-	elif [ -n "$newest" ] && offer "$plugin needs $modules, which no Python here has${note:+ ($note)}. Make a virtualenv at $root/venv with $newest, and install them from PyPI?"; then
-		PYTHON=$newest "$ROOT/xymon-plugin" venv "$target" || exit 1
+	elif [ -n "$newest" ] && fetch_ok "$plugin needs $modules, which no Python here has${note:+ ($note)}. Make a virtualenv at $root/venv with $newest, and install them from PyPI?"; then
+		was=$PYTHON; PYTHON=$newest; venv "$root"; PYTHON=$was
 	else
-		echo "No virtualenv at $root/venv, and no Python with the modules this plugin needs ($modules): ./xymon-plugin venv $target${newest:+ PYTHON=$newest} makes one and installs them; without it, the python3 on PATH must have them."
+		echo "No virtualenv at $root/venv, and no Python with the modules this plugin needs ($modules): ./xymon-plugin update $target --venv${newest:+ PYTHON=$newest} makes one and installs them; without it, the python3 on PATH must have them."
 	fi
 }
 
@@ -1018,8 +1046,7 @@ venv_auto() {
 # it: what every launcher runs with when XYMONAPI_PYTHON names no other. Run
 # again, it adds the modules of a plugin installed since.
 venv() {
-	[ -z "$DESTDIR" ] || die "a virtualenv is made on the installed system, not under DESTDIR: run this there, without DESTDIR"
-	[ -d "$1" ] || die "nothing is installed in $1 yet"
+	[ -z "$DESTDIR" ] || return 0
 	if [ ! -x "$1/venv/bin/python3" ]; then
 		"$PYTHON" -m venv "$1/venv" || exit 1
 		[ -x "$1/venv/bin/python3" ] || die "$PYTHON made no virtualenv at $1/venv"
@@ -1272,7 +1299,6 @@ uninstall_tools() {
 if [ -n "$SEL_TOOLS" ]; then PART=tools
 elif [ -n "$SEL_SERVER" ]; then PART=server
 elif [ "$VERB" = status ]; then PART=both
-elif [ "$VERB" = venv ]; then die "venv needs the part: --server, or --tools"
 elif [ -t 0 ] && [ -t 1 ]; then PART=server; echo "Part: server, the one Xymon part a plugin has here."
 else die "$VERB names no part, and there is no terminal to say it: --server, or --tools"
 fi
@@ -1340,6 +1366,14 @@ case $VERB in
 			[ -n "$(held "$EXTROOT" "$n" task)" ] || die "$n has no task to turn on or off"
 		done
 		[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
+		# enable refuses a plugin whose Python lacks the modules it needs,
+		# before any is turned on.
+		if [ "$VERB" = enable ]; then
+			for n in $(installed_tasks); do
+				m=$(missing_modules "$n")
+				[ -z "$m" ] || die "$n needs the Python modules $m, which the Python it runs with lacks: ./xymon-plugin update --server --venv $n makes them, or XYMONAPI_PYTHON names a Python that has them"
+			done
+		fi
 		for n in $(installed_tasks); do "$VERB" "$n"; done ;;
 	status)
 		# None named: every installation found is listed, and nothing is
@@ -1379,6 +1413,4 @@ case $VERB in
 				rmdir "$TOOLSROOT" 2>/dev/null || true
 			fi
 		fi ;;
-	venv)
-		venv "$PARTROOT" ;;
 esac
