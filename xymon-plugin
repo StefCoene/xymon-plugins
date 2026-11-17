@@ -426,7 +426,8 @@ choose_tree() {
 	found=$(printf '%s\n' "$trees" | sed -n 's/^\([a-z]*\) \(.*\)/  \2, a Xymon \1/p')
 	servers=$(printf '%s\n' "$trees" | sed -n 's/^server //p')
 	if ! { [ -t 0 ] && [ -t 1 ]; } || [ -z "$servers" ]; then
-		die "XYMONHOME is not set: XYMONHOME=<the Xymon server directory> ./xymon-plugin $VERB --server [PLUGIN...]${found:+
+		one=; [ "$(printf '%s\n' "$servers" | grep -c .)" -ne 1 ] || one=$servers
+		die "XYMONHOME is not set: XYMONHOME=${one:-<the Xymon server directory>} ./xymon-plugin $VERB --server${NAMES:+ $(echo $NAMES)}${ALL:+ --all}${found:+
 Xymon trees found here, none chosen:
 $found}"
 	fi
@@ -489,7 +490,8 @@ need_home() {
 		client)
 			# A server's own client tree: that server named, and what to type.
 			me=$(canon "$XYMONHOME"); srv=
-			s2=$(canon "$XYMONHOME/../server") && [ "$(marks "$s2")" = server ] && [ "$(client_of "$s2")" = "$me" ] && srv=$s2
+			s2=${XYMONHOME%/}; s2=${s2%/*}/server
+			[ "$(marks "$s2")" = server ] && [ "$(client_of "$s2")" = "$me" ] && srv=$s2
 			if [ -z "$srv" ]; then
 				srv=$(xymon_trees | sed -n 's/^server //p' | while IFS= read -r t; do
 					[ "$(client_of "$t")" = "$me" ] && { printf '%s\n' "$t"; break; }
@@ -1131,6 +1133,8 @@ install_server() {
 	[ -z "$was_task" ] || [ -n "$(field "$1" task)" ] || drop_task "$1"
 	task "$1"
 	conf "$1"
+	if [ -n "${UPDATING:-}" ]; then w=Updated; else w=Installed; fi
+	echo "$w $1 $(sed -e 's|^.*/v||' "$ext/VERSION") in $XYMONHOME/ext/$1."
 	say "$1" installed
 	restart "$1"
 	# A module the installed version loaded and this one has not goes.
@@ -1183,7 +1187,7 @@ install_tools() {
 	echo "$w $1 $(sed -e 's|^.*/v||' "$dir/VERSION") in $PREFIX/libexec/xymon-plugins/$1."
 	# Said once, and not under DESTDIR, where PATH is the build machine's.
 	if [ -n "$(field "$1" command)" ] && [ -z "$DESTDIR" ] && [ -z "${PATHSAID:-}" ]; then
-		case ":$PATH:" in *":$PREFIX/bin:"*) ;; *) echo "The commands are in $PREFIX/bin, which is not on PATH: add it."; PATHSAID=1 ;; esac
+		case ":$PATH:" in *":$PREFIX/bin:"*) ;; *) echo "The commands are in $PREFIX/bin, which is not on PATH: add it, as export PATH=\"$PREFIX/bin:\$PATH\" in your shell's profile."; PATHSAID=1 ;; esac
 	fi
 	say "$1" installed-tools
 	DONE="$DONE $1"
@@ -1197,7 +1201,7 @@ needed() {
 		[ -d "$p" ] || continue
 		ns=$(needs "${p##*/}" "$2" "$3") || exit 1
 		case " $ns " in
-			*" $1 "*) die "$1 is needed by ${p##*/}, installed in $3: remove ${p##*/} first" ;;
+			*" $1 "*) die "$1 is needed by ${p##*/}, installed in $3: ./xymon-plugin remove --$2 ${p##*/} first" ;;
 		esac
 	done
 	return 0
@@ -1426,6 +1430,22 @@ case $VERB in enable|disable) [ "$PART" != tools ] || die "the tools have no tas
 if [ "$PART" = tools ] && [ -n "$ROOTUSER" ] && [ "$VERB" != status ] && [ -z "$DESTDIR" ] && [ -z "$PREFIX_GIVEN" ]; then
 	die "the tools go in a person's own directory, not root's: run this without sudo, or give PREFIX= or DESTDIR="
 fi
+# What needs no installation is checked before one is asked for: the names,
+# --all, and, for install and update, which take the code from this
+# checkout, a plugin of it.
+for n in $NAMES; do plain "$n" || die "not a plugin name: '$n'"; done
+[ -z "$NAMES" ] || [ -z "$ALL" ] || die "--all, or plugins named: not both"
+case $VERB in
+	install|remove)
+		[ -n "$NAMES" ] || [ -n "$ALL" ] \
+			|| die "name the plugins to $VERB, or --all: the plugins are $(echo $(all_plugins))" ;;
+esac
+case $VERB in
+	install|update)
+		for n in $NAMES; do
+			[ -f "$ROOT/plugins/$n/PLUGIN" ] || die "no plugin $n here: the plugins are $(echo $(all_plugins))"
+		done ;;
+esac
 # The installation, named or chosen, once, before anything is looked at in
 # it; status reads it apart.
 if [ "$PART" = server ] && [ "$VERB" != status ]; then need_home; fi
@@ -1435,12 +1455,6 @@ if [ "$PART" = server ]; then PARTROOT=$EXTROOT; else PARTROOT=$TOOLSROOT; fi
 # they need when none is named; for an uninstall, the deepest first, so that
 # none is removed while one installed needs it.
 for n in $NAMES; do known "$n"; done
-[ -z "$NAMES" ] || [ -z "$ALL" ] || die "--all, or plugins named: not both"
-case $VERB in
-	install|remove)
-		[ -n "$NAMES" ] || [ -n "$ALL" ] \
-			|| die "name the plugins to $VERB, or --all: the plugins are $(echo $(all_plugins))" ;;
-esac
 if [ -n "$NAMES" ]; then LIST=$NAMES; else LIST=$(all_plugins); fi
 deepest_first() {
 	for n in $LIST; do echo "$(depth "$n" "$2" "$1") $n"; done | sort -rn | cut -d' ' -f2
@@ -1513,7 +1527,11 @@ case $VERB in
 		fi
 		if [ "$PART" != server ]; then
 			L=$LIST; [ -n "$NAMES" ] || L=$(with_installed "$TOOLSROOT")
-			for n in $L; do status tools "$TOOLSROOT" "$n"; done
+			[ "$PART" = tools ] || echo "Your tools, $PREFIX:"
+			for n in $L; do
+				l=$(status tools "$TOOLSROOT" "$n")
+				if [ -z "$l" ]; then :; elif [ "$PART" = tools ]; then echo "$l"; else echo "  $l"; fi
+			done
 		fi ;;
 	remove)
 		if [ "$PART" = server ]; then
@@ -1523,6 +1541,10 @@ case $VERB in
 			[ -n "$NAMES" ] || LIST=$(with_installed "$EXTROOT")
 			for n in $(deepest_first "$EXTROOT" server); do uninstall_server "$n"; done
 			[ -n "$NAMES" ] || rm -rf "$EXTROOT/venv"
+			# The stage served at /plugins, with no plugin left in it, goes.
+			if [ -d "$DIST" ] && [ ! -L "$DIST" ] && [ -z "$(ls -A "$DIST/plugins" 2>/dev/null)" ]; then
+				rm -rf "$DIST" || exit 1
+			fi
 		else
 			[ -n "$NAMES" ] || LIST=$(with_installed "$TOOLSROOT")
 			for n in $(deepest_first "$TOOLSROOT" tools); do uninstall_tools "$n"; done

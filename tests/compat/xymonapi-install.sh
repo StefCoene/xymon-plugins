@@ -250,6 +250,7 @@ for f in ext/xymonapi ext/xymonapi-mcp ext/xymonapi-rag etc/tasks.d/xymonapi etc
 	if [ -e "$home/$f" ] || [ -L "$home/$f" ]; then fail "[S8] xymon-plugin remove --server left $f"; fi
 done
 { [ -e "$work/man/man8/xymonapi.8" ] || [ -L "$work/man/man8/xymonapi.8" ]; } && fail "[S8] xymon-plugin remove --server left the manual page xymonapi.8"
+[ -e "$home/ext/xymon-plugins-dist" ] && fail "[S8] remove --server --all left the stage served at /plugins, with no plugin in it"
 { [ -e "$work/man/man1/xymonapi-rag.1" ] || [ -L "$work/man/man1/xymonapi-rag.1" ]; } && fail "xymon-plugin remove --server left the manual page xymonapi-rag.1"
 assert_contains "web server snippets went with ext/xymonapi" "$(cat "$work/uninstall.log")" "[S16] uninstall says the snippets went with the plugin"
 assert_contains "XYMONAPI_TOKENS" "$(cat "$work/uninstall.log")" "[S10] and that the tokens file is kept"
