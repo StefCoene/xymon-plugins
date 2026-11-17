@@ -271,6 +271,20 @@ Run with no verb, its input or its output not on a terminal, the command
 prints its usage, exits 2 and changes nothing, settings given or not: a
 script that forgot its verb installs, enables and removes nothing.
 
+**S27. With no verb on a terminal, the command shows, then offers.**
+Run with no verb, its input and its output on a terminal, it says what it
+found: the Xymon installation, by S25, each plugin installed there with
+its version and, for one with a task, whether it is on, and the person's
+tools. It then offers only what applies, one line each: install a plugin
+on the server, with what it does and the plugins it needs named; turn one
+on or off; update the server's plugins; remove one that no installed
+plugin needs; install a plugin's tools; update them; or nothing, the
+default, Enter. It prints the command those answers spell, asks
+`Proceed? [Y/n]`, runs exactly that command and nothing else, and stops;
+after an install of a plugin with a task it offers enabling as a second
+command, printed and asked with `[y/N]`, so that Enter declines it (S5).
+Off a terminal, S17.
+
 **S24. One command: a verb, and the part it acts on.**
 `xymon-plugin` takes a verb -- `install`, `update`, `enable`, `disable`,
 `remove`, `status`, `venv` -- and the part it acts on, `--server` or
@@ -427,22 +441,9 @@ brings its test.
   asks once a plugin has a client part; and, for `--tools` and
   `connect --tools`, the installation proposed too, whose local socket the
   dialogue offers as the API's URL.
-- **With no verb on a terminal, the command shows where things stand, then
-  offers what applies.** Run with no verb, its input and its output on a
-  terminal, it first says what it found: the Xymon installation, by the
-  rule above, which the person confirms, each plugin installed there, by
-  part, with its version and, for a part with a task, whether it is on, and the person's tools. It
-  then offers only what applies: install a plugin, each listed with one
-  line on what it does and none chosen by default, the plugins it needs
-  added and named (S3); turn one on or off; update; remove one, with no
-  default, refusing one another installed plugin needs (S8); install tools
-  for the person; connect this machine to an API; or nothing, the default.
-  It prints the command those answers spell, asks `Proceed? [Y/n]`, runs
-  exactly that command and nothing else, and says what comes next. After
-  an install it offers enabling, below; otherwise it stops. An install it runs enables
-  nothing (S5): turning the plugin on is offered after it, as a second
-  command printed and confirmed with `[y/N]`, so that Enter declines it.
-  Off a terminal, S17.
+- **With no verb on a terminal, the command shows where things stand
+  (S27)**; still to come: connecting this machine to an API among the
+  offers, with `connect`.
 - **The code comes from a source.** `install` and `update` take a
   plugin's code from a source: a Xymon server, through its API or its web
   server; GitHub, the plugin's releases; or one named with `--source`, a
